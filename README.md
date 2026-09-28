@@ -57,7 +57,12 @@ Danach auf dem Host für Tailscale das TUN-Gerät freigeben und die
 OMV-Backup-Freigabe einhängen (unprivilegierte Container können selbst kein
 NFS/SMB einhängen, deshalb über den Host):
 
+Tailscale braucht das TUN-Gerät (virtuelle Netzwerkschnittstelle `tailscale0`),
+das ein unprivilegierter Container nicht selbst anlegen darf:
+
 ```bash
+pve# pct set <CTID> --dev0 /dev/net/tun          # ab Proxmox 8.1 (Version: pveversion)
+# ältere Versionen stattdessen:
 pve# cat >> /etc/pve/lxc/<CTID>.conf <<'CONF'
 lxc.cgroup2.devices.allow: c 10:200 rwm
 lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
