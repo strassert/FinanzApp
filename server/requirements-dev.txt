@@ -1,1 +1,2 @@
 pytest>=8
+tzdata; sys_platform == "win32"   # Windows has no system time zone database
