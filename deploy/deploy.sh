@@ -29,7 +29,8 @@ run bash -c "cd web && npm ci --no-audit --no-fund && npm test && npm run build"
 
 if ((TESTS)); then
   step "Server-Tests"
-  run bash -c "cd server && { [[ -x .venv/bin/python ]] || python3 -m venv .venv; } \
+  python3 -c "import ensurepip" 2>/dev/null || { echo "python3-venv fehlt (apt install python3-venv)" >&2; exit 1; }
+  run bash -c "cd server && { [[ -x .venv/bin/pip ]] || { rm -rf .venv && python3 -m venv .venv; }; } \
     && .venv/bin/pip install -q -r requirements.txt -r requirements-dev.txt && .venv/bin/python -m pytest -q"
 fi
 

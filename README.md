@@ -81,7 +81,7 @@ Host plus 100000).
 ### 2. Tailscale im Container
 
 ```bash
-ct# apt update && apt install -y curl git nodejs npm sudo
+ct# apt update && apt install -y curl git nodejs npm sudo python3-venv
 ct# curl -fsSL https://tailscale.com/install.sh | sh
 ct# tailscale up            # im Browser anmelden; in der Tailscale-Konsole HTTPS aktivieren
 ```
