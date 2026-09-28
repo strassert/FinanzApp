@@ -129,7 +129,7 @@ wird die Bankbuchung damit verknüpft und die Meldung zählt nicht mehr.
 1. ✅ Interview und Steckbrief
 2. ✅ Projektdateien
 3. ✅ Fake-Bank (Enable-Banking-Mock; API-Annahmen noch gegen die Doku prüfen)
-4. Datenlogik mit Tests
+4. ✅ Datenlogik mit Tests
 5. Demo-Daten und lokaler Demo-Server
 6. Web-App, Ansicht für Ansicht
 7. Server-Betrieb: LXC, install/deploy, systemd, Tailscale, Kopplung

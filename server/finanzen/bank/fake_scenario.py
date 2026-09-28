@@ -244,7 +244,8 @@ def build_scenario(fake: FakeEnableBanking, today: date, months: int = 7,
                  instructed=("23.50", "GBP")))
     pu.append(tx("-12.99", ago(25), "Zahlung an Humble Bundle Inc.", name="Humble Bundle Inc.",
                  currency="USD", ref="PP-USD-1"))
-    pu.append(tx("20.00", ago(26), "Bankgutschrift auf PayPal-Konto", currency="USD", ref="PP-USD-0"))
+    pu.append(tx("20.00", ago(26), "Bankgutschrift auf PayPal-Konto", name=OWNER, currency="USD",
+                 ref="PP-USD-0"))
     # Pending card transactions (one gets booked later in tests)
     g.append(tx("-23.80", ago(1), "BILLA DANKT 4711 SALZBURG", status="PDNG", mcc="5411",
                 ref="VB-PEND-1"))

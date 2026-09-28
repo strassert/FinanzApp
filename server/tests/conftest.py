@@ -53,3 +53,35 @@ def scenario(fake):
 def provider(keypair, fake, clock):
     return EnableBankingProvider(APP_ID, keypair[0], transport=fake,
                                  clock=lambda: clock().timestamp())
+
+
+# --- database fixtures ------------------------------------------------------------
+
+from urllib.parse import parse_qs, urlparse  # noqa: E402
+
+from finanzen.core import db as core_db  # noqa: E402
+from finanzen import sync  # noqa: E402
+
+REDIRECT = "https://finanzen.example.ts.net/connect/callback"
+
+
+@pytest.fixture
+def conn():
+    c = core_db.connect(":memory:")
+    yield c
+    c.close()
+
+
+def connect_bank(conn, provider, fake, clock, bank):
+    url = sync.start_consent(conn, provider, bank, "AT", REDIRECT, now=clock)
+    q = parse_qs(urlparse(fake.approve(url)).query)
+    return sync.complete_consent(conn, provider, q["state"][0], q["code"][0], now=clock)
+
+
+@pytest.fixture
+def linked(conn, scenario, provider, fake, clock):
+    """All fake banks connected and synced."""
+    from finanzen.bank.fake_scenario import FLATEX, PAYLIFE, PAYPAL, VOLKSBANK
+    ids = {bank: connect_bank(conn, provider, fake, clock, bank)
+           for bank in (VOLKSBANK, FLATEX, PAYPAL, PAYLIFE)}
+    return ids
