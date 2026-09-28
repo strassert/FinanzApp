@@ -1,8 +1,9 @@
 """Enable Banking client (https://enablebanking.com/docs/api/reference/).
 
-API ASSUMPTIONS – written without access to the current docs. Verify against
-the API reference before connecting a real bank (build step 8); everything
-provider-specific lives in this file and in `fake.py`:
+API ASSUMPTIONS – checked against the API reference on 2026-09-28: endpoints,
+JWT claims and the fields below match; error codes follow the ErrorCode enum.
+Still unverified until the first real bank: which code a rejected PSU IP gets.
+Everything provider-specific lives in this file and in `fake.py`:
 
 - Auth: JWT RS256, header `kid` = application id, claims iss
   "enablebanking.com", aud "api.enablebanking.com", iat, exp (max 24 h).
@@ -83,16 +84,20 @@ def requests_transport(timeout: float = 30.0) -> Transport:
 
 # --- error mapping ----------------------------------------------------------
 
+# Codes from the API's ErrorCode enum. ASPSP_PSU_ACTION_REQUIRED means the bank
+# wants the user to authenticate again, so it is handled like an expired consent.
 _CONSENT_ERRORS = {"EXPIRED_SESSION", "CLOSED_SESSION", "REVOKED_SESSION",
-                   "INVALID_SESSION", "SESSION_DOES_NOT_EXIST", "ACCOUNT_DOES_NOT_EXIST",
-                   "EXPIRED_ACCESS"}
-_RATE_LIMIT_ERRORS = {"ASPSP_RATE_LIMIT_EXCEEDED", "RATE_LIMIT_EXCEEDED"}
-_PSU_ERRORS = {"WRONG_PSU_IP_ADDRESS", "INVALID_PSU_HEADERS", "PSU_HEADER_NOT_PROVIDED",
-               "WRONG_PSU_HEADERS"}
+                   "SESSION_DOES_NOT_EXIST", "ACCOUNT_DOES_NOT_EXIST",
+                   "WRONG_SESSION_STATUS", "ASPSP_PSU_ACTION_REQUIRED"}
+_RATE_LIMIT_ERRORS = {"ASPSP_RATE_LIMIT_EXCEEDED"}
+# The enum has no code for a rejected PSU IP address; WRONG_PSU_IP_ADDRESS is the
+# fake bank's placeholder until a real rejection has been observed.
+_PSU_ERRORS = {"PSU_HEADER_NOT_PROVIDED", "WRONG_PSU_IP_ADDRESS"}
 _AUTH_ERRORS = {"AUTHORIZATION_NOT_PROVIDED", "WRONG_AUTHORIZATION_CODE",
-                "EXPIRED_AUTHORIZATION_CODE", "ALREADY_AUTHORIZED"}
-_APP_ERRORS = {"WRONG_JWT", "EXPIRED_JWT", "INVALID_JWT", "UNTRUSTED_APPLICATION",
-               "APPLICATION_NOT_ACTIVE", "REDIRECT_URI_NOT_ALLOWED", "UNAUTHORIZED"}
+                "EXPIRED_AUTHORIZATION_CODE", "ALREADY_AUTHORIZED", "ACCESS_DENIED"}
+_APP_ERRORS = {"UNAUTHORIZED_ACCESS", "UNAUTHORIZED_IP", "REDIRECT_URI_NOT_ALLOWED",
+               "INVALID_HOST"}
+_BANK_DOWN_ERRORS = {"ASPSP_ERROR", "ASPSP_TIMEOUT", "ASPSP_ACCOUNT_NOT_ACCESSIBLE"}
 
 
 def raise_for_error(resp: HttpResponse) -> None:
@@ -111,7 +116,7 @@ def raise_for_error(resp: HttpResponse) -> None:
         raise AuthorizationFailed(message, code)
     if code in _APP_ERRORS or resp.status in (401, 403):
         raise ApplicationError(message, code)
-    if resp.status >= 500 or code in {"ASPSP_ERROR", "ASPSP_TIMEOUT"}:
+    if resp.status >= 500 or code in _BANK_DOWN_ERRORS:
         raise BankUnavailable(message, code)
     raise BankError(message, code)
 

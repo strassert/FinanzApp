@@ -168,31 +168,31 @@ class FakeEnableBanking:
 
     def _check_jwt(self, header: str) -> Optional[HttpResponse]:
         if not header.startswith("Bearer "):
-            return _err(401, "UNAUTHORIZED", "missing token")
+            return _err(401, "UNAUTHORIZED_ACCESS", "missing token")
         token = header[len("Bearer "):]
         try:
             if jwt.get_unverified_header(token).get("kid") != self.application_id:
-                return _err(401, "UNTRUSTED_APPLICATION", "unknown kid")
+                return _err(401, "UNAUTHORIZED_ACCESS", "unknown kid")
             claims = jwt.decode(token, self._public_key, algorithms=["RS256"],
                                 audience="api.enablebanking.com", issuer="enablebanking.com",
                                 options={"verify_exp": False, "verify_iat": False,
                                          "verify_nbf": False})
         except jwt.PyJWTError as exc:
-            return _err(401, "WRONG_JWT", type(exc).__name__)
+            return _err(401, "UNAUTHORIZED_ACCESS", type(exc).__name__)
         now = self.now().timestamp()
         if claims["iat"] > now + 60:
-            return _err(401, "WRONG_JWT", "issued in the future")
+            return _err(401, "UNAUTHORIZED_ACCESS", "issued in the future")
         if claims["exp"] < now:
-            return _err(401, "EXPIRED_JWT", "token expired")
+            return _err(401, "UNAUTHORIZED_ACCESS", "token expired")
         if claims["exp"] - claims["iat"] > 86400:
-            return _err(401, "WRONG_JWT", "lifetime above 24h")
+            return _err(401, "UNAUTHORIZED_ACCESS", "lifetime above 24h")
         return None
 
     def _start_auth(self, body: dict) -> HttpResponse:
         aspsp = body.get("aspsp") or {}
         inst = self.institutions.get((aspsp.get("name"), aspsp.get("country")))
         if inst is None:
-            return _err(422, "ASPSP_NOT_FOUND", "unknown institution")
+            return _err(422, "WRONG_ASPSP_PROVIDED", "unknown institution")
         redirect = body.get("redirect_url") or ""
         if not redirect.startswith("https://") or (self.redirect_urls and redirect not in self.redirect_urls):
             return _err(422, "REDIRECT_URI_NOT_ALLOWED", "redirect url not allowed")

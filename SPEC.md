@@ -56,10 +56,11 @@
 
 ## Offen aus dem Bau
 
-- Enable-Banking-API wurde ohne Zugriff auf die Doku umgesetzt (Domain war in
-  der Build-Umgebung gesperrt). Alle Annahmen stehen gesammelt in
-  `server/finanzen/bank/enablebanking.py` und werden vor der ersten echten
-  Bank geprüft.
+- Enable-Banking-API wurde ohne Zugriff auf die Doku umgesetzt und am
+  28.09.2026 gegen die API-Referenz geprüft: Endpunkte, JWT und Felder
+  stimmen, Fehlercodes korrigiert. Offen bis zur ersten echten Bank: welcher
+  Fehlercode bei abgelehnter PSU-IP kommt (Annahmen in
+  `server/finanzen/bank/enablebanking.py`).
 - `deploy/install.sh` ist nur per Syntaxprüfung und Probelauf geprüft, noch
   nicht auf einem Server ausgeführt.
 - flatex-Depot: vorerst Depotwert per Hand; Import erst, wenn eine echte

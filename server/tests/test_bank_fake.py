@@ -274,6 +274,12 @@ def test_closed_session(scenario, provider, fake):
     (500, {"error": "ASPSP_ERROR"}, BankUnavailable),
     (422, {"error": "WRONG_AUTHORIZATION_CODE"}, AuthorizationFailed),
     (401, {"error": "EXPIRED_SESSION"}, ConsentExpired),
+    (400, {"error": "ASPSP_PSU_ACTION_REQUIRED"}, ConsentExpired),
+    (422, {"error": "WRONG_SESSION_STATUS"}, ConsentExpired),
+    (400, {"error": "ASPSP_ACCOUNT_NOT_ACCESSIBLE"}, BankUnavailable),
+    (400, {"error": "ACCESS_DENIED"}, AuthorizationFailed),
+    (401, {"error": "UNAUTHORIZED_ACCESS"}, ApplicationError),
+    (400, {"error": "UNAUTHORIZED_IP"}, ApplicationError),
     (403, {}, ApplicationError),
     (418, {"error": "SOMETHING_NEW"}, BankError),
 ])
