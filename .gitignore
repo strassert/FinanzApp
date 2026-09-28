@@ -1,0 +1,53 @@
+# Secrets and keys – never commit
+*.pem
+*.key
+*.p12
+*.jks
+*.age
+age-key*.txt
+local.properties
+.env
+.env.*
+!.env.example
+config.local.*
+!*.example
+/etc/
+
+# Databases and backups
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+backups/
+
+# Real bank exports (test fixtures live in server/tests/fixtures and are synthetic)
+*.csv
+*.xlsx
+*.xls
+!server/tests/fixtures/**
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+htmlcov/
+
+# Web
+node_modules/
+web/dist/
+server/finanzen/static/app/
+.vite/
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
