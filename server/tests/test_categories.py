@@ -72,3 +72,13 @@ def test_expense_categories_have_stable_color_slots(conn):
     rows = conn.execute("SELECT name, color_slot FROM categories WHERE kind='expense' ORDER BY sort").fetchall()
     assert [r[1] for r in rows] == list(range(len(rows)))
     assert rows[0][0] == "Lebensmittel"
+
+
+def test_accents_are_ignored(conn):
+    cat.seed(conn)
+    ids = cat.ids_by_name(conn)
+    cat.add_rule(conn, "CAFE BAZAR", ids["Restaurant & Café"])
+    c = cat.Categorizer(conn)
+    assert c.categorize(amount_minor=-1, text="Café Bazar", mcc=None) == (ids["Restaurant & Café"], "rule")
+    assert name(conn, c.categorize(amount_minor=-1, text="Bäckerei Fritz", mcc=None)[0]) == "Lebensmittel"
+    assert name(conn, c.categorize(amount_minor=-1, text="ÖBB Ticket", mcc=None)[0]) == "Mobilität"

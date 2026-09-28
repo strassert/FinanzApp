@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+import unicodedata
 from dataclasses import dataclass
 from typing import Optional
 
@@ -114,13 +115,19 @@ def ids_by_name(conn: sqlite3.Connection) -> dict[str, int]:
     return {r["name"]: r["id"] for r in conn.execute("SELECT id, name FROM categories")}
 
 
+def fold(text: str) -> str:
+    """Uppercase without accents, so CAFÉ matches CAFE and BÄCKEREI matches BACKEREI."""
+    decomposed = unicodedata.normalize("NFKD", text.upper())
+    return "".join(c for c in decomposed if not unicodedata.combining(c))
+
+
 def _norm(text: str) -> str:
-    return " " + re.sub(r"\s+", " ", text.upper()) + " "
+    return " " + re.sub(r"\s+", " ", fold(text)) + " "
 
 
 def _contains(haystack: str, needle: str) -> bool:
     """Whole-word match (so SPAR does not match SPARPLAN)."""
-    pattern = r"(?<![A-Z0-9ÄÖÜ])" + re.escape(needle.strip().upper()) + r"(?![A-Z0-9ÄÖÜ])"
+    pattern = r"(?<![A-Z0-9])" + re.escape(fold(needle.strip())) + r"(?![A-Z0-9])"
     return re.search(pattern, haystack) is not None
 
 
@@ -158,7 +165,7 @@ class Categorizer:
         income = amount_minor > 0
         hay = _norm(text)
         for rule in self.rules:
-            if rule.pattern and rule.pattern.upper() in hay:
+            if rule.pattern and fold(rule.pattern.strip()) in hay:
                 return rule.category_id, "rule"
         wanted = "income" if income else "expense"
         for keyword, name in KEYWORDS:
