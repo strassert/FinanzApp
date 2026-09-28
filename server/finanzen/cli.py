@@ -35,7 +35,14 @@ def _provider(cfg: Config):
 def cmd_serve(cfg: Config, args) -> int:
     from waitress import serve
     from .api import create_app
-    provider, fake = (None, None) if cfg.demo else _provider(cfg)
+    provider = fake = None
+    if not cfg.demo:
+        try:
+            provider, fake = _provider(cfg)
+        except FileNotFoundError as exc:
+            # Serve the app anyway; bank routes answer 503 until the key exists.
+            print(f"Warnung: kein Bankzugang ({exc.filename} fehlt) – siehe README, Enable Banking",
+                  file=sys.stderr)
     app = create_app(cfg, provider=provider)
     if fake is not None:
         from flask import redirect, request
