@@ -23,12 +23,13 @@
   OMV-Freigabe (NFS/SMB) auf eigenen physischen Platten; privater
   age-Schlüssel nur offline/Passwort-Manager; Cloud-Kopie optional später.
 - Offene Punkte (erst mit echten Daten klärbar):
-  - Führt Enable Banking PayLife und flatex? Bei Volksbank Salzburg das
-    richtige Institut wählen.
+  - Führt Enable Banking PayLife und flatex?
   - Exportformat PayLife-Portal und flatex-Depot (CSV/Excel/PDF?).
   - Was liefert PayPal (Händler pro Zahlung, Finanzierungszeilen)?
-  - Laufzeit der Zustimmung und Historientiefe je Bank; liefert die
-    Volksbank Kartenumsätze?
+  - Laufzeit der Zustimmung und Historientiefe je Bank (flatex, PayPal,
+    PayLife).
+- Geklärt mit echten Daten (Volksbank Salzburg, seit 28.09.2026 verbunden):
+  Historie reicht bis 2024 zurück; Kartenumsätze kommen mit Händlernamen.
   - Welche Felder gibt die Kurzbefehle-Automation „Transaktion“ auf dem
     iPhone aus (Kartenname, Währung)?
 

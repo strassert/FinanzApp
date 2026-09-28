@@ -254,7 +254,7 @@ wird die Bankbuchung damit verknüpft und die Meldung zählt nicht mehr.
 4. ✅ Datenlogik mit Tests
 5. ✅ Demo-Daten und lokaler Demo-Server
 6. ✅ Web-App (Startseite, Umsätze, Erkunden, Konten, Kategorien, Import, Apple Pay)
-7. ✅ Server-Betrieb: Skripte, systemd, Tailscale serve, Kopplung, Backups – *noch nicht auf dem Server installiert*
-8. Echte Banken: Volksbank Salzburg, dann flatex, PayPal, PayLife
+7. ✅ Server-Betrieb: Skripte, systemd, Tailscale serve, Kopplung, Backups – installiert (LXC 108); Backup-Ablage noch einzurichten
+8. Echte Banken: ✅ Volksbank Salzburg, dann flatex, PayPal, PayLife
 9. ✅ Funktionen F1, F8, F9, F10, F11, F12 (F13 später)
 10. Release
