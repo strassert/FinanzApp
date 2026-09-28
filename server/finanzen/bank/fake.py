@@ -69,8 +69,9 @@ class FakeEnableBanking:
     def __init__(self, application_id: str, public_key_pem: bytes,
                  now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
                  page_size: int = 50, unattended_daily_limit: int = 4,
-                 restricted: bool = False):
+                 restricted: bool = False, auth_base: str = FAKE_AUTH_HOST):
         self.application_id = application_id
+        self.auth_base = auth_base.rstrip("/")
         self._public_key = public_key_pem
         self.now = now
         self.page_size = page_size
@@ -202,7 +203,7 @@ class FakeEnableBanking:
             "bank": inst["name"], "country": inst["country"], "state": body.get("state"),
             "redirect_url": redirect, "valid_until": min(valid_until, max_until),
         }
-        return HttpResponse(200, {"url": f"{FAKE_AUTH_HOST}/authorize?authorization_id={auth_id}",
+        return HttpResponse(200, {"url": f"{self.auth_base}/authorize?authorization_id={auth_id}",
                                   "authorization_id": auth_id})
 
     def _create_session(self, code: Optional[str]) -> HttpResponse:

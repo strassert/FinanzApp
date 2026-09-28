@@ -1,0 +1,14 @@
+# Copy to /etc/finanzen/config.toml (the install script does this).
+# No secrets in this file: the private key lives in its own file (mode 600).
+
+db_path = "/var/lib/finanzen/finanzen.db"
+host = "127.0.0.1"
+port = 8750
+public_url = "https://finanzen.<tailnet>.ts.net"
+country = "AT"
+demo = false
+bank = "enablebanking"          # "fake" for local development
+
+[enablebanking]
+application_id = "<application id from the Enable Banking control panel>"
+private_key_path = "/etc/finanzen/enablebanking.pem"

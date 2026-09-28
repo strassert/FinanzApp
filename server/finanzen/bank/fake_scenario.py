@@ -142,6 +142,7 @@ def build_scenario(fake: FakeEnableBanking, today: date, months: int = 7,
     g, f, pe, pu, pl = (giro.transactions, flatex.transactions, paypal_eur.transactions,
                         paypal_usd.transactions, paylife.transactions)
     n = 0
+    bank_funded: list[dict] = []   # PayPal purchases paid directly by the bank: no effect on the PayPal balance
 
     def ref(prefix: str) -> str:
         nonlocal n
@@ -212,8 +213,9 @@ def build_scenario(fake: FakeEnableBanking, today: date, months: int = 7,
         if d(12) <= today:
             amount = f"{rnd.randint(1500, 9000) / 100:.2f}"
             pp_id = f"{rnd.randint(10**12, 10**13 - 1)}"
-            pe.append(tx(f"-{amount}", d(12), "Zahlung an Zalando SE", name="Zalando SE",
-                         ref=ref("PP")))
+            bank_funded.append(tx(f"-{amount}", d(12), "Zahlung an Zalando SE", name="Zalando SE",
+                                  ref=ref("PP")))
+            pe.append(bank_funded[-1])
             g.append(tx(f"-{amount}", d(13), f"{pp_id} PP.4711.PP . Zalando SE, Ihr Einkauf bei Zalando SE",
                         name="PayPal Europe S.a.r.l. et Cie S.C.A", ref=ref("VB")))
         # PayPal purchase WITH funding line (bank -> PayPal, then purchase)
@@ -274,7 +276,7 @@ def build_scenario(fake: FakeEnableBanking, today: date, months: int = 7,
     giro_bal = Decimal("2150.00") + total(g) - total([dup])  # duplicate is not real money
     giro.balances = [bal(giro_bal, "CLBD"), bal(giro_bal + Decimal("1500.00") - Decimal("23.80"), "ITAV")]
     flatex.balances = [bal(Decimal("300.00") + total(f), "CLBD")]
-    paypal_eur.balances = [bal(total(pe), "ITAV")]
+    paypal_eur.balances = [bal(total(pe) - total(bank_funded), "ITAV")]
     paypal_usd.balances = [bal(total(pu, "USD"), "ITAV", "USD")]
     card_bal = total(pl)
     paylife.balances = [bal(card_bal, "CLBD"), bal(Decimal("3000.00") + card_bal - Decimal("54.00"), "ITAV")]
