@@ -9,7 +9,7 @@ from typing import Optional
 
 from .core.db import utcnow
 
-SCOPES = ("app", "home")
+SCOPES = ("app", "home", "wallet")   # wallet: only POST /api/wallet (iOS Shortcut)
 
 
 def _hash(token: str) -> str:

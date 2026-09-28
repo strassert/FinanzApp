@@ -1,3 +1,4 @@
+import io
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, urlparse
 
@@ -152,3 +153,38 @@ def test_explore_and_networth(client):
 def test_static_fallback_without_build(client):
     r = client.get("/")
     assert r.status_code == 503
+
+
+def test_wallet_token_can_only_post_wallet(cfg, conn, linked, provider, clock):
+    c = create_app(cfg, conn=conn, provider=provider, now=clock).test_client()
+    token = create_token(conn, "shortcut", "wallet")
+    h = {"Authorization": f"Bearer {token}"}
+    r = c.post("/api/wallet", json={"amount": "3,20 €", "merchant": "Bäckerei", "card": "PayLife Classic"}, headers=h)
+    assert r.status_code == 201 and r.get_json()["status"] == "recorded"
+    assert c.get("/api/overview", headers=h).status_code == 403
+    assert c.get("/api/wallet", headers=h).status_code == 403
+
+
+def test_unassigned_wallet_event_can_be_assigned(client, conn):
+    r = client.post("/api/wallet", json={"amount": "4,00", "merchant": "Kiosk", "card": "Meine Karte"}).get_json()
+    assert r["status"] == "unassigned"
+    card = conn.execute("SELECT id FROM accounts WHERE institution='PayLife'").fetchone()[0]
+    assert client.post(f"/api/wallet/{r['id']}/assign", json={"account_id": card, "remember": True}).status_code == 200
+    assert "Meine Karte" in conn.execute("SELECT patterns FROM accounts WHERE id=?", (card,)).fetchone()[0]
+    r2 = client.post("/api/wallet", json={"amount": "2,00", "merchant": "Kiosk", "card": "Meine Karte"}).get_json()
+    assert r2["status"] == "recorded"
+
+
+def test_import_endpoints(client, conn):
+    aid = client.post("/api/accounts", json={"name": "Alte Karte", "kind": "card"}).get_json()["id"]
+    data = b"Datum;Text;Betrag\n01.09.2026;BILLA;-10,00\n"
+    prev = client.post("/api/import/preview", data={"account_id": str(aid), "file": (io.BytesIO(data), "x.csv")},
+                       content_type="multipart/form-data")
+    assert prev.status_code == 200 and prev.get_json()["count"] == 1
+    import json as _json
+    r = client.post("/api/import", data={"account_id": str(aid), "mapping": _json.dumps(prev.get_json()["mapping"]),
+                                         "file": (io.BytesIO(data), "x.csv")}, content_type="multipart/form-data")
+    assert r.status_code == 200 and r.get_json()["new"] == 1
+    pdf = client.post("/api/import/preview", data={"account_id": str(aid), "file": (io.BytesIO(b"%PDF-1.4"), "a.pdf")},
+                      content_type="multipart/form-data")
+    assert pdf.status_code == 422 and "CSV" in pdf.get_json()["error"]

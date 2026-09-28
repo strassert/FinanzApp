@@ -171,7 +171,7 @@ def main(argv=None) -> int:
     p = sub.add_parser("token")
     p.add_argument("action", choices=["create", "list", "revoke"])
     p.add_argument("--name", default="iPhone")
-    p.add_argument("--scope", default="app", choices=["app", "home"])
+    p.add_argument("--scope", default="app", choices=["app", "home", "wallet"])
     p.add_argument("--id", type=int)
     p = sub.add_parser("pair")
     p.add_argument("--name", default="iPhone")

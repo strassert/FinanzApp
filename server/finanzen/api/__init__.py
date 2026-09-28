@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import json
 import logging
 import sqlite3
 import threading
@@ -17,7 +18,7 @@ from ..auth import check_token
 from ..bank import BankError, BankProvider, PsuHeaders
 from ..config import Config
 from ..core import db as core_db
-from ..core import queries, reports
+from ..core import importer, queries, reports, wallet
 from ..core.recompute import recompute
 from ..core.store import create_manual_account, store_balance
 
@@ -37,6 +38,7 @@ def create_app(cfg: Config, conn: Optional[sqlite3.Connection] = None,
                provider: Optional[BankProvider] = None,
                now: Callable[[], datetime] = lambda: datetime.now(timezone.utc)) -> Flask:
     app = Flask(__name__, static_folder=None)
+    app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
     app.config["CFG"] = cfg
     conn = conn or core_db.connect(cfg.db_path)
     lock = threading.RLock()          # one SQLite connection, serialised access
@@ -65,6 +67,8 @@ def create_app(cfg: Config, conn: Optional[sqlite3.Connection] = None,
         if g.scope is None:
             raise ApiError(401, "Nicht gekoppelt oder Token ungültig.")
         if g.scope == "home" and path != "/api/home":
+            raise ApiError(403, "Token ohne Berechtigung.")
+        if g.scope == "wallet" and not (path == "/api/wallet" and request.method == "POST"):
             raise ApiError(403, "Token ohne Berechtigung.")
         return None
 
@@ -369,6 +373,85 @@ def create_app(cfg: Config, conn: Optional[sqlite3.Connection] = None,
         results = sync.sync_all(conn, require_provider(), trigger="user", psu=psu, now=now)
         return jsonify({"results": [{"connection_id": r.connection_id, "status": r.status,
                                      "new": r.new_count, "message": r.message} for r in results]})
+
+    # --- file import (F1) ---------------------------------------------------------------
+
+    def upload() -> tuple[bytes, int]:
+        file = request.files.get("file")
+        try:
+            account_id = int(request.form.get("account_id", ""))
+        except ValueError:
+            raise ApiError(400, "Konto angeben.")
+        if file is None:
+            raise ApiError(400, "Keine Datei.")
+        if conn.execute("SELECT 1 FROM accounts WHERE id=?", (account_id,)).fetchone() is None:
+            raise ApiError(404, "Konto nicht gefunden.")
+        return file.read(), account_id
+
+    @app.post("/api/import/preview")
+    def import_preview():
+        data, account_id = upload()
+        try:
+            return jsonify(importer.preview(conn, data, account_id))
+        except importer.ImportError_ as exc:
+            raise ApiError(422, str(exc))
+
+    @app.post("/api/import")
+    def import_run():
+        data, account_id = upload()
+        try:
+            mapping = json.loads(request.form.get("mapping", "{}"))
+            with core_db.transaction(conn):
+                result = importer.run_import(conn, data, account_id, mapping)
+        except (importer.ImportError_, ValueError, TypeError, KeyError) as exc:
+            raise ApiError(422, str(exc) if isinstance(exc, importer.ImportError_) else "Ungültige Zuordnung.")
+        recompute(conn)
+        return jsonify(result)
+
+    # --- Apple Pay notifications (F9) ------------------------------------------------------
+
+    @app.post("/api/wallet")
+    def wallet_record():
+        data = body()
+        result = wallet.record(conn, amount=str(data.get("amount", "")), merchant=str(data.get("merchant", "")),
+                               card=str(data.get("card", "")), currency=data.get("currency") or None,
+                               when=now())
+        if result["status"] == "recorded":
+            recompute(conn)
+        return jsonify(result), 201 if result["status"] == "recorded" else 200
+
+    @app.get("/api/wallet")
+    def wallet_list():
+        rows = conn.execute("""SELECT id, occurred_at, amount_minor, currency, merchant, card, status, reason
+                               FROM wallet_events ORDER BY id DESC LIMIT 50""").fetchall()
+        return jsonify({"items": [dict(r) for r in rows]})
+
+    @app.post("/api/wallet/<int:event_id>/assign")
+    def wallet_assign(event_id: int):
+        data = body()
+        ev = conn.execute("SELECT * FROM wallet_events WHERE id=? AND status='unassigned'", (event_id,)).fetchone()
+        if ev is None or ev["amount_minor"] is None:
+            raise ApiError(404, "Meldung nicht gefunden.")
+        account = conn.execute("SELECT id, patterns FROM accounts WHERE id=?", (data.get("account_id"),)).fetchone()
+        if account is None:
+            raise ApiError(400, "Konto angeben.")
+        if data.get("remember") and ev["card"]:
+            patterns = ",".join(p for p in [account["patterns"], ev["card"]] if p)
+            conn.execute("UPDATE accounts SET patterns=? WHERE id=?", (patterns, account["id"]))
+        conn.execute("UPDATE wallet_events SET status='reassigned' WHERE id=?", (event_id,))
+        amount = f"{-ev['amount_minor'] / 100:.2f}"
+        result = wallet.record(conn, amount=amount, merchant=ev["merchant"] or "", card=ev["card"] or "",
+                               currency=ev["currency"], when=datetime.fromisoformat(ev["occurred_at"]))
+        if result["status"] != "recorded":
+            # the card still does not match: book directly on the chosen account
+            from ..core.store import NewTx, upsert_transactions
+            when = datetime.fromisoformat(ev["occurred_at"])
+            upsert_transactions(conn, account["id"], "wallet", [NewTx(
+                booking_date=when.astimezone(wallet.LOCAL_TZ).date(), amount_minor=ev["amount_minor"],
+                currency=ev["currency"], status="pending", ext_ref=f"wallet:{ev['occurred_at']}:{ev['amount_minor']}",
+                counterparty=ev["merchant"], description="Apple Pay", apple_pay=True, card=ev["card"])])
+        recompute(conn)
+        return jsonify({"ok": True})
 
     # --- consent callback (opened by the bank in the browser) ----------------------------
 
