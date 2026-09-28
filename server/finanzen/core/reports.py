@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import sqlite3
+from bisect import bisect_right
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Iterable, Optional
@@ -170,9 +171,10 @@ def account_balances(conn: sqlite3.Connection, days: list[date]) -> dict[int, di
         else:
             # manual / imported snapshots (depot value, card debt): last known value
             ordered = sorted(snaps, key=lambda s: s["as_of"])
+            dates = [s["as_of"] for s in ordered]
             for d in days:
-                known = [s for s in ordered if s["as_of"] <= d.isoformat()]
-                series[d] = known[-1]["amount_minor"] if known else None
+                i = bisect_right(dates, d.isoformat()) - 1
+                series[d] = ordered[i]["amount_minor"] if i >= 0 else None
         out[acc["id"]] = series
     return out
 

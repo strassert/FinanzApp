@@ -165,6 +165,7 @@ pc$ scripts/verify-backup.sh /pfad/zur/omv-freigabe/finanzen finanzen-backup-key
 | Abrufe 06:30 und 18:30 | `systemctl list-timers finanzen-sync.timer`, Log: `journalctl -u finanzen-sync` |
 | Dienst | `systemctl status finanzen`, `journalctl -u finanzen` |
 | Manuell abrufen | `sudo -u finanzen finanzen sync` |
+| Kurse und Depotwert (läuft mit jedem Abruf) | `sudo -u finanzen finanzen quotes`; Symbole unter `[quotes]` in `/etc/finanzen/config.toml` |
 | Demo (erfundene Daten) | `https://finanzen.<tailnet>.ts.net:8443/` |
 
 ### Entwicklung
@@ -235,6 +236,11 @@ er nach dem Monat, den er großteils abdeckt (Gehalt am 28. Sep → „Oktober�
   nicht „verfügbar“ (der enthält den Kreditrahmen).
 - **Saldo an einem vergangenen Tag:** letzter Saldo minus die Buchungen
   seither.
+- **Depotwert:** Stückzahl je ISIN an dem Tag × letzter bekannter Kurs in EUR.
+  Stückzahlen aus dem flatex-Export „Depotumsätze“ (Käufe/Verkäufe; die
+  Buchungspaare „Thesaurierung transparenter Fonds“ sind österreichische
+  Steuerbuchungen und ändern den Bestand nicht). Kurse: Tagesschluss für
+  ISINs mit Symbol unter `[quotes]`, sonst der Ausführungskurs aus dem Export.
 - **Fremdwährungen:** EZB-Referenzkurs des Buchungsdatums; ohne Kurs nicht
   in Summen, sondern als „nicht umgerechnet“ gezählt.
 
@@ -255,6 +261,6 @@ wird die Bankbuchung damit verknüpft und die Meldung zählt nicht mehr.
 5. ✅ Demo-Daten und lokaler Demo-Server
 6. ✅ Web-App (Startseite, Umsätze, Erkunden, Konten, Kategorien, Import, Apple Pay)
 7. ✅ Server-Betrieb: Skripte, systemd, Tailscale serve, Kopplung, Backups – installiert (LXC 108); Backup-Ablage noch einzurichten
-8. Echte Banken: ✅ Volksbank Salzburg, dann flatex, PayPal, PayLife
+8. Echte Banken: ✅ Volksbank Salzburg, ✅ flatex-Depot per Export + Tageskurse (flatex nicht bei Enable Banking), dann PayPal, PayLife (Import)
 9. ✅ Funktionen F1, F8, F9, F10, F11, F12 (F13 später)
 10. Release

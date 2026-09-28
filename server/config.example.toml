@@ -16,3 +16,8 @@ private_key_path = "/etc/finanzen/enablebanking.pem"
 # Encrypted nightly backups (age). Only the PUBLIC key is on the server.
 backup_dir = "/mnt/backup/finanzen"             # OMV share, bind-mounted into the container
 backup_recipient_file = "/etc/finanzen/backup-recipient.txt"
+
+# Daily prices for depot positions (ISIN -> symbol with EUR prices, Yahoo Finance).
+# Holdings come from the broker export (Konten -> Datei importieren).
+[quotes]
+# IE00BK5BQT80 = "VWCE.DE"

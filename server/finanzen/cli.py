@@ -7,6 +7,7 @@ token create|list|revoke  manage API tokens
 pair [--name NAME]        create an app token and print the pairing link + QR code
 sync                      fetch all connections (used by the systemd timer)
 fx                        update ECB rates
+quotes                    update security prices and depot values
 backup [--dir D]          encrypted backup (age, public key only), keeps 14
 """
 
@@ -17,6 +18,7 @@ import logging
 import sys
 from datetime import date
 from pathlib import Path
+from typing import Optional
 
 from . import __version__
 from .config import Config, load
@@ -112,6 +114,7 @@ def cmd_sync(cfg: Config, args) -> int:
         fx.update_rates(conn, _http_get)
     except Exception as exc:  # rates are optional for a sync
         logging.warning("ECB rates not updated: %s", type(exc).__name__)
+    _update_quotes(cfg, conn)
     results = sync.sync_all(conn, provider, trigger="schedule")
     for r in results:
         print(f"connection {r.connection_id}: {r.status} ({r.new_count} neu) {r.message}")
@@ -120,9 +123,26 @@ def cmd_sync(cfg: Config, args) -> int:
 
 def _http_get(url: str) -> bytes:
     import requests
-    resp = requests.get(url, timeout=60)
+    resp = requests.get(url, timeout=60, headers={"User-Agent": f"Mozilla/5.0 (finanzen {__version__})"})
     resp.raise_for_status()
     return resp.content
+
+
+def _update_quotes(cfg: Config, conn) -> Optional[int]:
+    from .core import depot
+    try:
+        return depot.update_quotes(conn, cfg.quotes, _http_get, date.today())
+    except Exception as exc:  # quotes are optional; the last known price stays
+        logging.warning("quotes not updated: %s", type(exc).__name__)
+        return None
+
+
+def cmd_quotes(cfg: Config, args) -> int:
+    stored = _update_quotes(cfg, _conn(cfg))
+    if stored is None:
+        return 2
+    print(f"{stored} Kurse gespeichert")
+    return 0
 
 
 def cmd_fx(cfg: Config, args) -> int:
@@ -227,6 +247,7 @@ def main(argv=None) -> int:
     p.add_argument("--name", default="iPhone")
     sub.add_parser("sync")
     sub.add_parser("fx")
+    sub.add_parser("quotes")
     p = sub.add_parser("backup")
     p.add_argument("--dir", help="Zielverzeichnis (Standard: backup_dir aus der Konfiguration)")
     p.add_argument("--keep", type=int, default=14)
@@ -234,5 +255,5 @@ def main(argv=None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     cfg = load(args.config)
     handler = {"serve": cmd_serve, "demo": cmd_demo, "check": cmd_check, "token": cmd_token,
-               "pair": cmd_pair, "sync": cmd_sync, "fx": cmd_fx, "backup": cmd_backup}[args.command]
+               "pair": cmd_pair, "sync": cmd_sync, "fx": cmd_fx, "quotes": cmd_quotes, "backup": cmd_backup}[args.command]
     return handler(cfg, args)

@@ -26,6 +26,7 @@ class Config:
     sync_times: list[str] = field(default_factory=lambda: ["06:30", "18:30"])
     backup_dir: str = "/mnt/backup/finanzen"
     backup_recipient_file: str = "/etc/finanzen/backup-recipient.txt"   # age public key(s)
+    quotes: dict[str, str] = field(default_factory=dict)                 # ISIN -> quote symbol (EUR)
 
     @property
     def redirect_url(self) -> str:

@@ -402,7 +402,7 @@ def create_app(cfg: Config, conn: Optional[sqlite3.Connection] = None,
         try:
             mapping = json.loads(request.form.get("mapping", "{}"))
             with core_db.transaction(conn):
-                result = importer.run_import(conn, data, account_id, mapping)
+                result = importer.run_import(conn, data, account_id, mapping, today=today())
         except (importer.ImportError_, ValueError, TypeError, KeyError) as exc:
             raise ApiError(422, str(exc) if isinstance(exc, importer.ImportError_) else "Ungültige Zuordnung.")
         recompute(conn)

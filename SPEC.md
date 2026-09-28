@@ -23,13 +23,18 @@
   OMV-Freigabe (NFS/SMB) auf eigenen physischen Platten; privater
   age-Schlüssel nur offline/Passwort-Manager; Cloud-Kopie optional später.
 - Offene Punkte (erst mit echten Daten klärbar):
-  - Führt Enable Banking PayLife und flatex?
+  - PayLife: nicht bei Enable Banking (Stand 28.09.2026) → Datei-Import;
+    Exportformat noch offen.
   - Exportformat PayLife-Portal und flatex-Depot (CSV/Excel/PDF?).
   - Was liefert PayPal (Händler pro Zahlung, Finanzierungszeilen)?
   - Laufzeit der Zustimmung und Historientiefe je Bank (flatex, PayPal,
     PayLife).
 - Geklärt mit echten Daten (Volksbank Salzburg, seit 28.09.2026 verbunden):
   Historie reicht bis 2024 zurück; Kartenumsätze kommen mit Händlernamen.
+- flatex (AT) ist bei Enable Banking nicht verfügbar (weder AT noch DE).
+  Depot: Import des Exports „Depotumsätze“ (CSV, `;`, cp1252) mit exakten
+  Stückzahlen, Tageskurse per Symbol. Verrechnungskonto: CSV-Import.
+  PayPal ist für AT verfügbar.
   - Welche Felder gibt die Kurzbefehle-Automation „Transaktion“ auf dem
     iPhone aus (Kartenname, Währung)?
 
@@ -64,5 +69,7 @@
   `server/finanzen/bank/enablebanking.py`).
 - `deploy/install.sh` ist nur per Syntaxprüfung und Probelauf geprüft, noch
   nicht auf einem Server ausgeführt.
-- flatex-Depot: vorerst Depotwert per Hand; Import erst, wenn eine echte
-  Exportdatei vorliegt.
+- flatex-Depot: Import „Depotumsätze“ gebaut (gegen echten Export geprüft).
+  Die Kursquelle (Yahoo Finance) ist inoffiziell; fällt sie aus, bleibt der
+  letzte Kurs stehen. Positionen, die im Export fehlen (z. B. schon
+  verkaufte), sind im Verlauf nicht enthalten.

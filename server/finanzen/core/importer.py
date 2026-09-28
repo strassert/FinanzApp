@@ -19,6 +19,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from ..money import to_minor
+from . import depot
 from .store import NewTx, store_balance, upsert_transactions
 
 MAX_ROWS = 20000
@@ -339,10 +340,26 @@ def parse_rows(rows: list[list[str]], m: Mapping, default_currency: str) -> Pars
     return Parsed(out, skipped, last_balance)
 
 
+def _depot_account(conn: sqlite3.Connection, account_id: int) -> None:
+    kind = conn.execute("SELECT kind FROM accounts WHERE id=?", (account_id,)).fetchone()[0]
+    if kind != "depot":
+        raise ImportError_("Das ist ein Depot-Export. Bitte ein Depot-Konto wählen "
+                           "(unter „Konten“ als Art „Depot“ anlegen).")
+
+
 def preview(conn: sqlite3.Connection, data: bytes, account_id: int) -> dict:
     rows = read_rows(data)
     if len(rows) < 2:
         raise ImportError_("Die Datei enthält keine Umsätze.")
+    if depot.is_flatex_depot(rows):
+        _depot_account(conn, account_id)
+        trades, skipped = depot.parse_flatex_depot(rows)
+        totals: dict[str, dict] = {}
+        for t in trades:
+            item = totals.setdefault(t.isin, {"isin": t.isin, "name": t.name, "quantity": Decimal(0)})
+            item["quantity"] += t.quantity
+        return {"kind": "depot", "template": "flatex Depotumsätze", "count": len(trades), "skipped": skipped,
+                "holdings": [dict(h, quantity=str(h["quantity"])) for h in totals.values() if h["quantity"]]}
     saved = conn.execute("SELECT mapping FROM import_mappings WHERE account_id=?", (account_id,)).fetchone()
     template = None
     if saved:
@@ -368,8 +385,20 @@ def preview(conn: sqlite3.Connection, data: bytes, account_id: int) -> dict:
     }
 
 
-def run_import(conn: sqlite3.Connection, data: bytes, account_id: int, mapping_json: dict) -> dict:
+def run_import(conn: sqlite3.Connection, data: bytes, account_id: int, mapping_json: dict,
+               today: Optional[date] = None) -> dict:
     rows = read_rows(data)
+    if depot.is_flatex_depot(rows):
+        _depot_account(conn, account_id)
+        trades, skipped = depot.parse_flatex_depot(rows)
+        if not trades:
+            raise ImportError_("Die Datei enthält keine Depotumsätze.")
+        new, known = depot.import_trades(conn, account_id, trades)
+        depot.revalue(conn, account_id, today or date.today())
+        return {"new": new, "known": known, "skipped": skipped,
+                "first": min(t.booking_date for t in trades).isoformat(),
+                "last": max(t.booking_date for t in trades).isoformat(),
+                "holdings": depot.holdings_summary(conn, account_id, today or date.today())}
     mapping = Mapping.from_json(mapping_json)
     currency = conn.execute("SELECT currency FROM accounts WHERE id=?", (account_id,)).fetchone()[0]
     parsed = parse_rows(rows, mapping, currency)
