@@ -5,7 +5,8 @@ automatisch ab (über [Enable Banking](https://enablebanking.com), PSD2),
 erkennt Umbuchungen und Duplikate, kategorisiert und zeigt alles in einer
 Web-App, die auf dem iPhone wie eine normale App vom Home-Bildschirm startet.
 
-> Stand: Projektgerüst. Code folgt schrittweise, siehe „Bauplan“ unten.
+> Stand: App und Server fertig mit Demo-Daten getestet; echte Bankanbindung
+> und Installation auf dem Server stehen aus (siehe „Bauplan“).
 > Spezifikation: [SPEC.md](SPEC.md). Regeln für Agenten: [AGENTS.md](AGENTS.md).
 
 ## Architektur
@@ -44,19 +45,133 @@ Web-App, die auf dem iPhone wie eine normale App vom Home-Bildschirm startet.
 
 ## Setup
 
-*Wird in Bauschritt 7 ausgefüllt:* LXC-Container anlegen, `deploy/install.sh`
-(idempotent: Nutzer, Verzeichnisse, venv, systemd-Units, Tailscale serve),
-Enable-Banking-Application einrichten, App koppeln, Kurzbefehl einrichten,
-Backups auf die OMV-Freigabe.
+Alles läuft in einem eigenen LXC-Container auf dem Proxmox-Server. Befehle
+mit `pve#` auf dem Proxmox-Host, mit `ct#` im Container (als root), mit
+`pc$` auf deinem Rechner.
 
-Entwicklung lokal:
+### 1. Container anlegen
+
+In der Proxmox-Oberfläche: *Create CT* mit der Vorlage **Debian 13**,
+unprivilegiert, 1 CPU, 512 MB RAM, 8 GB Disk, Hostname `finanzen`.
+Danach auf dem Host für Tailscale das TUN-Gerät freigeben und die
+OMV-Backup-Freigabe einhängen (unprivilegierte Container können selbst kein
+NFS/SMB einhängen, deshalb über den Host):
 
 ```bash
-cd server && python -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt -r requirements-dev.txt
-python -m pytest
-cd ../web && npm install && npm test && npm run build
+pve# cat >> /etc/pve/lxc/<CTID>.conf <<'CONF'
+lxc.cgroup2.devices.allow: c 10:200 rwm
+lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
+CONF
+# OMV-Freigabe auf dem Host einhängen (NFS-Beispiel) und in den Container durchreichen
+pve# mkdir -p /mnt/omv-backup && echo "<omv-ip>:/export/backup /mnt/omv-backup nfs defaults,_netdev 0 0" >> /etc/fstab && mount -a
+pve# pct set <CTID> -mp0 /mnt/omv-backup,mp=/mnt/backup
+pve# pct reboot <CTID>
 ```
+
+Im unprivilegierten Container gehören Dateien der UID 100000+. Lege auf dem
+Share ein Verzeichnis `finanzen` an, das der Container-Nutzer `finanzen`
+beschreiben darf (UID im Container: `id -u finanzen` nach Schritt 3, auf dem
+Host plus 100000).
+
+### 2. Tailscale im Container
+
+```bash
+ct# apt update && apt install -y curl git nodejs npm sudo
+ct# curl -fsSL https://tailscale.com/install.sh | sh
+ct# tailscale up            # im Browser anmelden; in der Tailscale-Konsole HTTPS aktivieren
+```
+
+### 3. Installieren
+
+```bash
+ct# git clone https://github.com/strassert/FinanzApp.git /root/FinanzApp && cd /root/FinanzApp
+ct# deploy/deploy.sh            # Probelauf: zeigt nur, was passieren würde
+ct# deploy/deploy.sh --apply    # baut, testet, installiert, startet
+```
+
+`install.sh` ist idempotent: Nutzer `finanzen`, `/opt/finanzen` (Programm
+und venv), `/var/lib/finanzen` (Datenbank), `/etc/finanzen` (Konfiguration),
+systemd-Units, `tailscale serve` (App auf Port 443, Demo auf 8443). Pakete
+werden nur neu installiert, wenn sich `requirements.txt` ändert.
+Aktualisieren: `git pull && deploy/deploy.sh --apply`.
+
+### 4. Enable Banking
+
+> Die Schritte folgen der Vorlage und sind noch gegen die aktuelle Enable-Banking-Doku zu prüfen (Bauschritt 8).
+
+1. Im Control Panel von Enable Banking eine Application als **Production**
+   anlegen. Redirect-URL: `https://finanzen.<tailnet>.ts.net/connect/callback`.
+2. Schlüssel: Entweder das Panel erzeugt ihn (dann genau diese `.pem`-Datei
+   verwenden) oder du erzeugst ihn im Container und lädst nur das Zertifikat hoch:
+   ```bash
+   ct# openssl req -new -x509 -days 3650 -nodes -subj "/CN=finanzen" \
+         -newkey rsa:2048 -keyout /etc/finanzen/enablebanking.pem -out /root/enablebanking.crt
+   ct# chown finanzen:finanzen /etc/finanzen/enablebanking.pem && chmod 600 /etc/finanzen/enablebanking.pem
+   ```
+3. Die Application über „Activate by linking accounts“ aktivieren und die
+   eigenen Konten verknüpfen. Eine eingeschränkte Application liefert nur
+   verknüpfte Konten – eine leere Verbindung heißt meist: Konto nicht verknüpft.
+4. `application_id` in `/etc/finanzen/config.toml` eintragen, dann prüfen:
+   `ct# sudo -u finanzen finanzen check`
+
+Der private Schlüssel verlässt den Container nie.
+
+### 5. iPhone koppeln
+
+```bash
+ct# sudo -u finanzen finanzen pair
+```
+
+Den Link (oder QR-Code) auf dem iPhone in **Safari** öffnen (Tailscale muss
+verbunden sein), dann *Teilen → Zum Home-Bildschirm*. Danach in der App unter
+*Konten → Bank verbinden* zuerst die Volksbank Salzburg verbinden. Die
+Zustimmung öffnet sich im Browser; direkt danach wird die ganze Historie
+geladen. Tokens verwalten: `finanzen token list|revoke --id N`.
+
+Apple Pay sofort erfassen: Anleitung in der App unter *Konten → Apple Pay
+sofort erfassen* (eigener Token mit `--scope wallet`, der nur Zahlungen
+melden darf).
+
+### 6. Backups
+
+Auf **deinem Rechner** ein Schlüsselpaar erzeugen; nur der öffentliche Teil
+kommt auf den Server:
+
+```bash
+pc$ age-keygen -o finanzen-backup-key.txt      # privat: in den Passwort-Manager, offline aufheben
+pc$ age-keygen -y finanzen-backup-key.txt      # öffentlich: age1...
+ct# echo "age1..." > /etc/finanzen/backup-recipient.txt
+ct# deploy/install.sh                          # aktiviert den Backup-Timer (03:15, 14 behalten)
+ct# sudo -u finanzen finanzen backup           # einmal sofort
+```
+
+Prüfen, ohne Live-Daten anzufassen (auf dem Rechner mit dem privaten Schlüssel):
+
+```bash
+pc$ scripts/verify-backup.sh /pfad/zur/omv-freigabe/finanzen finanzen-backup-key.txt
+```
+
+### Betrieb
+
+| Was | Wo |
+| --- | --- |
+| Abrufe 06:30 und 18:30 | `systemctl list-timers finanzen-sync.timer`, Log: `journalctl -u finanzen-sync` |
+| Dienst | `systemctl status finanzen`, `journalctl -u finanzen` |
+| Manuell abrufen | `sudo -u finanzen finanzen sync` |
+| Demo (erfundene Daten) | `https://finanzen.<tailnet>.ts.net:8443/` |
+
+### Entwicklung
+
+```bash
+cd server && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+.venv/bin/python -m pytest
+.venv/bin/python -m finanzen demo --out /tmp/demo.db
+printf 'db_path="/tmp/demo.db"\ndemo=true\n' > /tmp/demo.toml && .venv/bin/python -m finanzen --config /tmp/demo.toml serve
+cd ../web && npm install && npm test && npm run build     # oder: npm run dev (Proxy auf :8750)
+```
+
+Mit `bank = "fake"` in einer lokalen Config läuft der ganze Ablauf inklusive
+Bank-Zustimmung gegen die eingebaute Fake-Bank.
 
 ## Wie die Zahlen berechnet werden
 
@@ -130,9 +245,9 @@ wird die Bankbuchung damit verknüpft und die Meldung zählt nicht mehr.
 2. ✅ Projektdateien
 3. ✅ Fake-Bank (Enable-Banking-Mock; API-Annahmen noch gegen die Doku prüfen)
 4. ✅ Datenlogik mit Tests
-5. Demo-Daten und lokaler Demo-Server
-6. Web-App, Ansicht für Ansicht
-7. Server-Betrieb: LXC, install/deploy, systemd, Tailscale, Kopplung
+5. ✅ Demo-Daten und lokaler Demo-Server
+6. ✅ Web-App (Startseite, Umsätze, Erkunden, Konten, Kategorien, Import, Apple Pay)
+7. ✅ Server-Betrieb: Skripte, systemd, Tailscale serve, Kopplung, Backups – *noch nicht auf dem Server installiert*
 8. Echte Banken: Volksbank Salzburg, dann flatex, PayPal, PayLife
-9. Funktionen F1, F8, F9, F11, F12 (F13 später)
+9. ✅ Funktionen F1, F8, F9, F10, F11, F12 (F13 später)
 10. Release

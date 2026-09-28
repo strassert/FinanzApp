@@ -1,0 +1,20 @@
+[Unit]
+Description=Finanzen Demo (erfundene Daten, nur lesend)
+After=network-online.target
+
+[Service]
+User=finanzen
+Group=finanzen
+Environment=FINANZEN_CONFIG=/etc/finanzen/demo.toml
+ExecStartPre=/opt/finanzen/venv/bin/python -m finanzen demo --out /var/lib/finanzen/demo.db
+ExecStart=/opt/finanzen/venv/bin/python -m finanzen serve
+WorkingDirectory=/opt/finanzen/app
+Restart=on-failure
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/finanzen
+
+[Install]
+WantedBy=multi-user.target

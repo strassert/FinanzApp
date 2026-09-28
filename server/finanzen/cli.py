@@ -7,6 +7,7 @@ token create|list|revoke  manage API tokens
 pair [--name NAME]        create an app token and print the pairing link + QR code
 sync                      fetch all connections (used by the systemd timer)
 fx                        update ECB rates
+backup [--dir D]          encrypted backup (age, public key only), keeps 14
 """
 
 from __future__ import annotations
@@ -158,6 +159,48 @@ def cmd_check(cfg: Config, args) -> int:
     return 0 if ok else 1
 
 
+def cmd_backup(cfg: Config, args) -> int:
+    """Consistent SQLite copy -> gzip -> age (public key only) -> backup dir; keep N."""
+    import gzip
+    import shutil
+    import sqlite3
+    import subprocess
+    import tempfile
+    from datetime import datetime
+
+    target = Path(args.dir or cfg.backup_dir)
+    recipients = cfg.backup_recipient_file
+    if not target.is_dir():
+        print(f"Backup-Ziel fehlt oder ist nicht eingehängt: {target}", file=sys.stderr)
+        return 1
+    if not Path(recipients).is_file():
+        print(f"Öffentlicher age-Schlüssel fehlt: {recipients}", file=sys.stderr)
+        return 1
+    if shutil.which("age") is None:
+        print("age ist nicht installiert (apt install age).", file=sys.stderr)
+        return 1
+    stamp = datetime.now().strftime("%Y%m%d-%H%M")
+    final = target / f"finanzen-{stamp}.db.gz.age"
+    with tempfile.TemporaryDirectory() as tmp:
+        copy = Path(tmp) / "finanzen.db"
+        src = sqlite3.connect(cfg.db_path)
+        dst = sqlite3.connect(copy)
+        src.backup(dst)
+        dst.close()
+        src.close()
+        packed = Path(tmp) / "finanzen.db.gz"
+        with open(copy, "rb") as fi, gzip.open(packed, "wb") as fo:
+            shutil.copyfileobj(fi, fo)
+        partial = final.with_suffix(".partial")
+        subprocess.run(["age", "--encrypt", "-R", recipients, "-o", str(partial), str(packed)], check=True)
+        partial.rename(final)
+    backups = sorted(target.glob("finanzen-*.db.gz.age"))
+    for old in backups[:-args.keep]:
+        old.unlink()
+    print(f"Backup: {final} ({final.stat().st_size // 1024} KB), {min(len(backups), args.keep)} behalten")
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="finanzen", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -177,9 +220,12 @@ def main(argv=None) -> int:
     p.add_argument("--name", default="iPhone")
     sub.add_parser("sync")
     sub.add_parser("fx")
+    p = sub.add_parser("backup")
+    p.add_argument("--dir", help="Zielverzeichnis (Standard: backup_dir aus der Konfiguration)")
+    p.add_argument("--keep", type=int, default=14)
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     cfg = load(args.config)
     handler = {"serve": cmd_serve, "demo": cmd_demo, "check": cmd_check, "token": cmd_token,
-               "pair": cmd_pair, "sync": cmd_sync, "fx": cmd_fx}[args.command]
+               "pair": cmd_pair, "sync": cmd_sync, "fx": cmd_fx, "backup": cmd_backup}[args.command]
     return handler(cfg, args)

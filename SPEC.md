@@ -53,3 +53,14 @@
 | F11 | Demo-Version mit erfundenen Daten, eigene Adresse, nur lesend |
 | F12 | Verschlüsselte nächtliche Backups auf die OMV-Freigabe |
 | F13 | *später:* Kennzahlen für Home Assistant über eingeschränkten Token |
+
+## Offen aus dem Bau
+
+- Enable-Banking-API wurde ohne Zugriff auf die Doku umgesetzt (Domain war in
+  der Build-Umgebung gesperrt). Alle Annahmen stehen gesammelt in
+  `server/finanzen/bank/enablebanking.py` und werden vor der ersten echten
+  Bank geprüft.
+- `deploy/install.sh` ist nur per Syntaxprüfung und Probelauf geprüft, noch
+  nicht auf einem Server ausgeführt.
+- flatex-Depot: vorerst Depotwert per Hand; Import erst, wenn eine echte
+  Exportdatei vorliegt.

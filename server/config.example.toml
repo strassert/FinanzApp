@@ -12,3 +12,7 @@ bank = "enablebanking"          # "fake" for local development
 [enablebanking]
 application_id = "<application id from the Enable Banking control panel>"
 private_key_path = "/etc/finanzen/enablebanking.pem"
+
+# Encrypted nightly backups (age). Only the PUBLIC key is on the server.
+backup_dir = "/mnt/backup/finanzen"             # OMV share, bind-mounted into the container
+backup_recipient_file = "/etc/finanzen/backup-recipient.txt"

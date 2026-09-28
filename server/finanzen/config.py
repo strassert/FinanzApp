@@ -24,6 +24,8 @@ class Config:
     private_key_path: str = "/etc/finanzen/enablebanking.pem"
     static_dir: str = str(Path(__file__).parent / "static" / "app")
     sync_times: list[str] = field(default_factory=lambda: ["06:30", "18:30"])
+    backup_dir: str = "/mnt/backup/finanzen"
+    backup_recipient_file: str = "/etc/finanzen/backup-recipient.txt"   # age public key(s)
 
     @property
     def redirect_url(self) -> str:

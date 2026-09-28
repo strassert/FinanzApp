@@ -1,0 +1,23 @@
+[Unit]
+Description=Finanzen (API + Web-App)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=finanzen
+Group=finanzen
+Environment=FINANZEN_CONFIG=/etc/finanzen/config.toml
+ExecStart=/opt/finanzen/venv/bin/python -m finanzen serve
+WorkingDirectory=/opt/finanzen/app
+Restart=on-failure
+RestartSec=5
+# hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/finanzen
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
