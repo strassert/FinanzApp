@@ -91,7 +91,7 @@ def cmd_pair(cfg: Config, args) -> int:
         return 1
     token = create_token(_conn(cfg), args.name, "app")
     link = f"{cfg.public_url.rstrip('/')}/#/koppeln/{token}"
-    print("Öffne diesen Link auf dem iPhone in Safari (oder scanne den QR-Code):\n")
+    print("Kopplungslink – in der App vom Home-Bildschirm einfügen (oder QR-Code scannen):\n")
     print(link + "\n")
     try:
         import qrcode  # optional

@@ -127,8 +127,10 @@ Der private Schlüssel verlässt den Container nie.
 ct# sudo -u finanzen finanzen pair
 ```
 
-Den Link (oder QR-Code) auf dem iPhone in **Safari** öffnen (Tailscale muss
-verbunden sein), dann *Teilen → Zum Home-Bildschirm*. Danach in der App unter
+Auf dem iPhone (Tailscale verbunden) `https://finanzen.<tailnet>.ts.net/` in
+**Safari** öffnen, *Teilen → Zum Home-Bildschirm*, die App vom Home-Bildschirm
+starten und den Kopplungslink dort einfügen. (Die Home-Bildschirm-App hat
+eigenen Speicher; eine Kopplung nur in Safari gilt dort nicht.) Danach in der App unter
 *Konten → Bank verbinden* zuerst die Volksbank Salzburg verbinden. Die
 Zustimmung öffnet sich im Browser; direkt danach wird die ganze Historie
 geladen. Tokens verwalten: `finanzen token list|revoke --id N`.
