@@ -6,6 +6,7 @@
   import BarList from "../components/BarList.svelte";
   import TrendChart from "../components/TrendChart.svelte";
   import LineChart from "../components/LineChart.svelte";
+  import ForecastCard from "../components/ForecastCard.svelte";
 
   let { onerror }: { onerror: (e: unknown) => void } = $props();
 
@@ -98,6 +99,8 @@
         </p>
       {/if}
     </section>
+
+    <ForecastCard {onerror} />
 
     <!-- 2. Kategorien -->
     <section class="card">

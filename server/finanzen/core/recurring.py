@@ -1,7 +1,8 @@
 """Recurring payments (Fixkosten): bookings that repeat at a steady interval
 with a steady amount.
 
-Detection (pure function over booked expense and income rows):
+Detection (pure function over booked rows; expense and income for the
+Fixkosten list, plus transfers for the balance forecast):
 1. Group by account, direction and payee (counterparty, else the booking
    text without digits).
 2. Within a group, cluster by amount: in date order, a booking joins the
@@ -54,10 +55,11 @@ class Booking:
     account_id: int
     date: date
     amount_eur: int
-    role: str                         # expense | income
+    role: str                         # expense | income | transfer
     counterparty: str = ""
     description: str = ""
     category_id: Optional[int] = None
+    source: str = ""                  # api | import | wallet | manual
 
 
 @dataclass
@@ -161,12 +163,13 @@ def expected_amount(amounts: list[int]) -> tuple[int, Optional[int]]:
     return int(median(amounts[-3:])), None
 
 
-def detect(bookings: list[Booking], today: date) -> list[Recurring]:
+def detect(bookings: list[Booking], today: date,
+           roles: tuple[str, ...] = ("expense", "income")) -> list[Recurring]:
     groups: dict[str, list[Booking]] = {}
     for b in bookings:
-        if b.amount_eur == 0 or (b.role == "expense") != (b.amount_eur < 0):
+        if b.amount_eur == 0 or (b.role == "expense" and b.amount_eur > 0):
             continue                  # refunds are not recurring payments
-        if b.role not in ("expense", "income") or not payee_key(b):
+        if b.role not in roles or not payee_key(b):
             continue
         groups.setdefault(group_key(b), []).append(b)
 
@@ -193,13 +196,15 @@ def detect(bookings: list[Booking], today: date) -> list[Recurring]:
 
 # --- database -------------------------------------------------------------------------
 
-def load_bookings(conn: sqlite3.Connection, since: date) -> list[Booking]:
-    rows = conn.execute("""
+def load_bookings(conn: sqlite3.Connection, since: date,
+                  roles: tuple[str, ...] = ("expense", "income")) -> list[Booking]:
+    marks = ",".join("?" * len(roles))
+    rows = conn.execute(f"""
         SELECT t.id, t.account_id, t.booking_date, t.counterparty, t.description,
                d.role, d.category_id, d.amount_eur_minor
         FROM transactions t JOIN tx_derived d ON d.tx_id=t.id
-        WHERE t.status='booked' AND t.removed_at IS NULL AND d.role IN ('expense','income')
-          AND d.amount_eur_minor IS NOT NULL AND t.booking_date >= ?""", (since.isoformat(),))
+        WHERE t.status='booked' AND t.removed_at IS NULL AND d.role IN ({marks})
+          AND d.amount_eur_minor IS NOT NULL AND t.booking_date >= ?""", (*roles, since.isoformat()))
     return [Booking(r["id"], r["account_id"], date.fromisoformat(r["booking_date"]), r["amount_eur_minor"],
                     r["role"], r["counterparty"] or "", r["description"] or "", r["category_id"])
             for r in rows]

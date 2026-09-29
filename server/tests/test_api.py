@@ -197,3 +197,9 @@ def test_recurring_list_and_reject(client):
     assert r.status_code == 200
     assert rent["key"] in {i["key"] for i in r.get_json()["rejected"]}
     assert client.post("/api/recurring/decision", json={"key": rent["key"], "decision": "x"}).status_code == 400
+
+
+def test_forecast(client):
+    data = client.get("/api/forecast").get_json()
+    assert data["until"] >= data["today"]
+    assert data["forecast"] == sum(a["forecast"] for a in data["accounts"])

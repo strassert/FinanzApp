@@ -272,6 +272,24 @@ länger als einen Rhythmus überfällig ist.
 - **„Keine Fixkosten“:** wird je Empfänger gespeichert und übersteht jede
   Neuberechnung.
 
+### Kontostandsprognose
+
+Für jedes EUR-Konto mit Bankanbindung, bis zum Ende des Budget-Zeitraums
+(also bis vor das nächste Gehalt):
+
+Prognose = Kontostand heute + vorgemerkte Umsätze, die der Saldo noch nicht
+enthält + alle erwarteten regelmäßigen Buchungen bis dahin.
+
+- Apple-Pay-Meldungen zählen immer als noch nicht enthalten, vorgemerkte
+  Bankumsätze nur, wenn die Bank einen Saldo ohne Vormerkungen liefert.
+- Erwartet werden die Fixkosten wie oben, zusätzlich regelmäßige
+  Umbuchungen (z. B. Sparplan). Ein Termin entfällt, wenn um diesen Tag
+  (± Toleranz des Rhythmus) schon eine Buchung desselben Empfängers
+  vorgemerkt ist oder mit anderem Betrag gebucht wurde. Überfällige Termine
+  zählen weiter.
+- Zusätzlich wird der tiefste Stand im Zeitraum mit Datum angezeigt.
+- Nicht erfasst: Kreditkartenabrechnungen mit wechselndem Betrag.
+
 ### Vorgemerkte Umsätze und Apple Pay
 
 Vorgemerkte Umsätze, die beim nächsten Abruf fehlen, werden durch die

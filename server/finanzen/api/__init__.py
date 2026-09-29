@@ -18,7 +18,7 @@ from ..auth import check_token
 from ..bank import BankError, BankProvider, PsuHeaders
 from ..config import Config
 from ..core import db as core_db
-from ..core import importer, queries, recurring, reports, wallet
+from ..core import forecast, importer, queries, recurring, reports, wallet
 from ..core.recompute import recompute
 from ..core.store import create_manual_account, store_balance
 
@@ -194,6 +194,10 @@ def create_app(cfg: Config, conn: Optional[sqlite3.Connection] = None,
                 s = reports.sums(conn, p.start, p.end)
                 timeline.append({**reports.period_dict(p), "spent": s.spent, "income": s.income})
         return jsonify({"sankey": reports.sankey(conn, start, end), "timeline": timeline})
+
+    @app.get("/api/forecast")
+    def forecast_view():
+        return jsonify(forecast.forecast(conn, today()))
 
     @app.get("/api/recurring")
     def recurring_list():

@@ -123,3 +123,12 @@ export interface RecurringItem {
 export interface Recurring {
   items: RecurringItem[]; rejected: RecurringItem[]; monthly_expense: number; monthly_income: number;
 }
+export interface ExpectedBooking {
+  date: string; name: string; amount: number; role: string; interval: Interval; key: string; overdue: boolean;
+}
+export interface ForecastAccount {
+  id: number; name: string; kind: string; color_slot: number | null;
+  balance: number; pending: number; forecast: number; lowest: number; lowest_date: string;
+  expected: ExpectedBooking[];
+}
+export interface Forecast { today: string; until: string; accounts: ForecastAccount[]; balance: number; forecast: number }
