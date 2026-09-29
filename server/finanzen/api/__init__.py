@@ -41,6 +41,8 @@ def create_app(cfg: Config, conn: Optional[sqlite3.Connection] = None,
     app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
     app.config["CFG"] = cfg
     conn = conn or core_db.connect(cfg.db_path)
+    if conn.execute("SELECT 1 FROM tx_derived WHERE budget_date IS NULL LIMIT 1").fetchone():
+        recompute(conn)               # derived data from before migration 004
     lock = threading.RLock()          # one SQLite connection, serialised access
 
     def today() -> date:
@@ -169,9 +171,11 @@ def create_app(cfg: Config, conn: Optional[sqlite3.Connection] = None,
     @app.get("/api/periods")
     def periods():
         cal = reports.calendar(conn)
-        first = conn.execute("SELECT MIN(booking_date) FROM transactions").fetchone()[0]
+        first, last = conn.execute("SELECT MIN(budget_date), MAX(budget_date) FROM tx_derived").fetchone()
         start = date.fromisoformat(first) if first else today()
-        items = [reports.period_dict(p) for p in cal.range(start, today())]
+        # a salary booked at the end of the month already opens the next one
+        end = max(today(), date.fromisoformat(last)) if last else today()
+        items = [reports.period_dict(p) for p in cal.range(start, end)]
         return jsonify({"current": reports.period_dict(cal.period_for(today())), "items": items[::-1]})
 
     @app.get("/api/networth")

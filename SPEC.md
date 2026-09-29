@@ -11,7 +11,7 @@
 - Funktionen: K1–K5, F1, F2, F4–F8, F9 (Apple Pay über eine
   Kurzbefehle-Automation), F10, F11 (Demo als eigene Adresse, nur lesend), F12.
   Später: F13 (Home Assistant, auf demselben Proxmox). Abgewählt: F3.
-- Zeitraum: Gehalt am ~29.; keine gemeinsamen Konten; Apple-Pay-Zahlungen
+- Zeitraum: Kalendermonat, Gehalt am ~29. zählt zum Folgemonat; keine gemeinsamen Konten; Apple-Pay-Zahlungen
   eigens markiert (belasten aber die hinterlegte Karte).
 - Aussehen: „Finanzen“, Deutsch; ruhig und hell (plus Dunkelmodus nach
   iPhone-Einstellung), Akzent gedecktes Grün mit Kupfer. Startseite:
@@ -48,7 +48,7 @@
 | K4 | Konten und Bankverbindungen, Zustimmung erneuern |
 | K5 | Umbuchungen und Duplikate erkennen, unsichere Fälle zur Bestätigung |
 | F1 | Datei-Import (CSV, XLSX, XLS) für PayLife und flatex-Depot, Dateiauswahl in der App |
-| F2 | Budget-Zeitraum von Gehalt zu Gehalt (~29.) |
+| F2 | Budget-Zeitraum = Kalendermonat; Gehalt aus den letzten Monatstagen zählt zum Folgemonat (bis 29.09.2026: von Gehalt zu Gehalt) |
 | F4 | Karten-Auswahl auf der Startseite, Diagramm „Ausgaben nach Karte“ |
 | F5 | Vermögensverlauf (1 M bis alles), inkl. Depotwert |
 | F6 | Budget-Anzeige in der Umsatzliste: Rest, Einnahmen, Ausgegeben, Übrig pro Tag |

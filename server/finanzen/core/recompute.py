@@ -10,6 +10,7 @@ from . import categories as cat
 from .db import get_setting, transaction
 from .fx import Rates
 from .linking import Account, Tx, link_all
+from .periods import budget_day
 
 
 def load_accounts(conn: sqlite3.Connection) -> dict[int, Account]:
@@ -58,13 +59,22 @@ def recompute(conn: sqlite3.Connection) -> dict:
             cat_id, source = derived[purchase_id][1], "refund"
         derived[refund_id] = ("expense", cat_id, source, eur[refund_id])
 
+    raw_day = get_setting(conn, "salary_day", "0")
+    calendar_months = not (raw_day and raw_day.isdigit() and int(raw_day) > 0)
+    salary_ids = {r["id"] for r in conn.execute("SELECT id FROM categories WHERE name=?", (cat.SALARY,))}
+    by_id = {r["id"]: r for r in rows}
+
+    def counts_on(tx_id: int, role: str, cat_id: int) -> str:
+        day = date.fromisoformat(by_id[tx_id]["booking_date"])
+        return budget_day(day, role == "income" and cat_id in salary_ids, calendar_months).isoformat()
+
     with transaction(conn):
         conn.execute("DELETE FROM tx_derived")
         conn.execute("DELETE FROM links")
         conn.executemany(
-            "INSERT INTO tx_derived (tx_id, role, category_id, category_source, amount_eur_minor) "
-            "VALUES (?,?,?,?,?)",
-            [(tx_id, *values) for tx_id, values in derived.items()])
+            "INSERT INTO tx_derived (tx_id, role, category_id, category_source, amount_eur_minor, budget_date) "
+            "VALUES (?,?,?,?,?,?)",
+            [(tx_id, *values, counts_on(tx_id, values[0], values[1])) for tx_id, values in derived.items()])
         conn.executemany(
             "INSERT INTO links (kind, a_id, b_id, status, evidence) VALUES (?,?,?,?,?)",
             [(l.kind, l.a_id, l.b_id, l.status, l.evidence) for l in result.links])

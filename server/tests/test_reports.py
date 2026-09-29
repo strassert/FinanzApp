@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from finanzen.core import reports
+from finanzen.core import queries, reports
 from finanzen.core.fx import store_rates
 from finanzen.core.recompute import recompute
 
@@ -51,11 +51,11 @@ def test_overview_consistency(conn, linked):
     assert ov["spent"] > 0 and ov["income"] > 0
     assert sum(c["amount"] for c in ov["categories"]) == ov["spent"]
     assert sum(c["amount"] for c in ov["cards"]) == ov["spent"]
-    assert ov["period"]["label"] == "September 2026"          # salary 28 Aug -> September
-    assert ov["period"]["start"] == "2026-08-28"
+    assert ov["period"]["label"] == "September 2026"          # calendar month
+    assert (ov["period"]["start"], ov["period"]["end"]) == ("2026-09-01", "2026-09-30")
     assert len(ov["trend"]) == 12 and ov["trend"][-1]["key"] == "2026-09"
     assert ov["previous"]["spent_same_day"] <= ov["previous"]["spent"]
-    assert ov["budget"]["days_left"] == 1                   # 28 Sep, salary expected 29 Sep
+    assert ov["budget"]["days_left"] == 3                   # 28, 29, 30 Sep
 
 
 def test_card_filter_limits_sums(conn, linked):
@@ -140,3 +140,40 @@ def test_category_average_over_complete_past_periods(conn, linked):
 def test_category_average_needs_history(conn):
     cal = reports.calendar(conn)
     assert reports.category_averages(conn, cal, cal.period_for(TODAY)) == ([], {})
+
+
+def test_late_salary_counts_for_next_calendar_month(conn, linked):
+    days = {r["booking_date"]: r["budget_date"] for r in conn.execute(
+        """SELECT t.booking_date, d.budget_date FROM transactions t JOIN tx_derived d ON d.tx_id=t.id
+           WHERE t.description LIKE 'GEHALT%'""")}
+    assert days["2026-08-28"] == "2026-09-01" and days["2026-07-29"] == "2026-08-01"
+    cal = reports.calendar(conn)
+
+    def salary(start, end):
+        return sum(c["amount"] for c in reports.by_category(conn, start, end, role="income") if c["name"] == "Gehalt")
+    assert salary(date(2026, 8, 1), date(2026, 8, 31)) == 324000     # July's salary only
+    sep = cal.period_for(TODAY)
+    assert salary(sep.start, sep.end) == 324000                      # paid 28 Aug
+    listed = queries.list_transactions(conn, start=sep.start, end=sep.end, query="GEHALT")["items"]
+    assert [(t["date"], t["budget_date"]) for t in listed] == [("2026-08-28", "2026-09-01")]
+
+
+def test_salary_to_salary_periods_stay_available(conn, linked):
+    from finanzen.core.db import set_setting
+    set_setting(conn, "salary_day", "29")
+    recompute(conn)
+    period = reports.calendar(conn).period_for(TODAY)
+    assert (period.label, period.start) == ("September 2026", date(2026, 8, 28))   # salary on 28 Aug
+    row = conn.execute("""SELECT t.booking_date, d.budget_date FROM transactions t JOIN tx_derived d
+                          ON d.tx_id=t.id WHERE t.description LIKE 'GEHALT%' ORDER BY t.booking_date DESC""").fetchone()
+    assert row[0] == row[1]
+
+
+def test_budget_does_not_count_next_months_salary(conn, linked):
+    from finanzen.core import recurring
+    from finanzen.core.periods import Period
+    sep = Period(2026, 9, date(2026, 9, 1), date(2026, 9, 30))
+    expected = recurring.upcoming(conn, TODAY, sep.end)
+    assert any(e.role == "income" and e.date == date(2026, 9, 28) for e in expected)   # salary due today
+    b = reports.budget(conn, sep, TODAY, reports.sums(conn, sep.start, sep.end))
+    assert b["income_expected"] == 0                          # it is October's money

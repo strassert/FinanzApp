@@ -1,6 +1,6 @@
 <script lang="ts">
   import { api, query, type Category, type Period, type Tx, type TxList } from "../lib/api";
-  import { eur, relativeDay, signed } from "../lib/format";
+  import { eur, monthShort, relativeDay, signed } from "../lib/format";
   import { slotVar } from "../lib/colors";
   import { route, go } from "../lib/router.svelte";
   import TxDetail from "../components/TxDetail.svelte";
@@ -145,6 +145,7 @@
               <span class="sub small muted">
                 {t.category.name} · {t.account.name}
                 {#if t.status === "pending"}<span class="tag">vorgemerkt</span>{/if}
+                {#if t.budget_date && t.budget_date.slice(0, 7) !== t.date.slice(0, 7)}<span class="tag">zählt für {monthShort(t.budget_date.slice(0, 7))}</span>{/if}
                 {#if t.apple_pay}<span class="tag">Apple Pay</span>{/if}
                 {#if t.role === "excluded"}<span class="tag">nicht mitgezählt</span>{/if}
                 {#if t.note}<span class="note">· {t.note}</span>{/if}

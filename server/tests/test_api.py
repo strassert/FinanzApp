@@ -203,3 +203,11 @@ def test_forecast(client):
     data = client.get("/api/forecast").get_json()
     assert data["until"] >= data["today"]
     assert data["forecast"] == sum(a["forecast"] for a in data["accounts"])
+
+
+def test_periods_include_month_opened_by_salary(client, conn):
+    conn.execute("""UPDATE tx_derived SET budget_date='2026-10-01'
+                    WHERE tx_id=(SELECT MAX(id) FROM transactions)""")
+    data = client.get("/api/periods").get_json()
+    assert data["current"]["key"] == "2026-09"
+    assert data["items"][0]["key"] == "2026-10"

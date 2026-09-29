@@ -219,10 +219,19 @@ eingebaute Schlagwörter → MCC der Karte → „Sonstiges“.
 
 ### Budget-Zeitraum
 
-Ein Zeitraum läuft von Gehalt zu Gehalt. Zeitraum M beginnt nominell am
-29. des Vormonats. Liegt eine Gehaltsbuchung zwischen 10 Tagen davor und
-5 Tagen danach, beginnt er stattdessen an ihrem Buchungsdatum. Benannt wird
-er nach dem Monat, den er großteils abdeckt (Gehalt am 28. Sep → „Oktober“).
+Ein Zeitraum ist ein Kalendermonat. Das Gehalt (Kategorie „Gehalt“) kommt
+spätestens am 1. des Folgemonats und ist das Geld für diesen Monat: Eine
+Gehaltsbuchung in den letzten 10 Tagen eines Monats zählt daher ab dem 1.
+des Folgemonats (Gehalt am 29. Sep → Einnahme im Oktober). Alle Summen
+rechnen mit diesem Tag; in der Umsatzliste steht bei so einer Buchung
+„zählt für Okt“. Der Folgemonat lässt sich damit schon auswählen, sobald
+das Gehalt da ist.
+
+Alternativ von Gehalt zu Gehalt (Einstellung `salary_day` in der Tabelle
+`settings`, z. B. `29`): Zeitraum M beginnt nominell am 29. des Vormonats;
+eine Gehaltsbuchung zwischen 10 Tagen davor und 5 Tagen danach verschiebt
+den Beginn auf ihr Buchungsdatum. Benannt nach dem Monat, den er großteils
+abdeckt.
 
 ### Kennzahlen
 
@@ -284,7 +293,7 @@ länger als einen Rhythmus überfällig ist.
 ### Kontostandsprognose
 
 Für jedes EUR-Konto mit Bankanbindung, bis zum Ende des Budget-Zeitraums
-(also bis vor das nächste Gehalt):
+(Monatsende; ein Gehalt, das vorher kommt, ist enthalten):
 
 Prognose = Kontostand heute + vorgemerkte Umsätze, die der Saldo noch nicht
 enthält + alle erwarteten regelmäßigen Buchungen bis dahin.

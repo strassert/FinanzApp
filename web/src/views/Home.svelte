@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { api, query, type NetWorthPoint, type Overview, type Recurring } from "../lib/api";
+  import { api, query, type NetWorthPoint, type Overview, type Period, type Recurring } from "../lib/api";
   import { day, eur, percent, signed } from "../lib/format";
   import { slotVar } from "../lib/colors";
-  import { go } from "../lib/router.svelte";
+  import { go, route } from "../lib/router.svelte";
   import BarList from "../components/BarList.svelte";
   import TrendChart from "../components/TrendChart.svelte";
   import LineChart from "../components/LineChart.svelte";
@@ -16,11 +16,35 @@
   let worth = $state<NetWorthPoint[]>([]);
   let loading = $state(false);
   let fixed = $state<Recurring | null>(null);
+  let periods = $state<Period[]>([]);          // newest first
+  let currentKey = $state("");
+
+  // month shown on the home screen: #/?period=2026-08, current month without
+  const periodKey = $derived(route.params.get("period") ?? "");
+  const shownKey = $derived(periodKey || currentKey);
+  const shownIdx = $derived(periods.findIndex((p) => p.key === shownKey));
+  const isCurrent = $derived(!periodKey || periodKey === currentKey);
+
+  async function loadPeriods() {
+    try {
+      const p = await api.get<{ current: Period; items: Period[] }>("/api/periods");
+      periods = p.items;
+      currentKey = p.current.key;
+    } catch (e) {
+      onerror(e);
+    }
+  }
+  loadPeriods();
+
+  function step(delta: number) {
+    const target = periods[shownIdx - delta];
+    if (target) go("", target.key === currentKey ? {} : { period: target.key });
+  }
 
   async function load() {
     loading = true;
     try {
-      data = await api.get<Overview>("/api/overview" + query({ accounts: cards }));
+      data = await api.get<Overview>("/api/overview" + query({ accounts: cards, period: periodKey || undefined }));
     } catch (e) {
       onerror(e);
     } finally {
@@ -45,7 +69,7 @@
   }
   loadFixed();
 
-  $effect(() => { void cards; load(); });
+  $effect(() => { void cards; void periodKey; load(); });
   $effect(() => { void range; loadWorth(); });
 
   function toggleCard(id: number | null) {
@@ -63,7 +87,13 @@
   <div class:reloading={loading}>
     <!-- 1. Ausgaben -->
     <section class="card hero" aria-labelledby="h-spent">
-      <div class="period small muted">{data.period.label}</div>
+      <div class="period">
+        <button class="nav" aria-label="Vorheriger Monat" disabled={shownIdx < 0 || shownIdx >= periods.length - 1}
+                onclick={() => step(-1)}>‹</button>
+        <span class="small">{data.period.label}</span>
+        <button class="nav" aria-label="Nächster Monat" disabled={shownIdx <= 0} onclick={() => step(1)}>›</button>
+        {#if !isCurrent}<button class="today small" onclick={() => go("")}>Aktueller Monat</button>{/if}
+      </div>
       <h2 id="h-spent" class="sr-only">Ausgaben</h2>
       <div class="label small">Ausgegeben{cards.length ? " (Auswahl)" : ""}</div>
       <div class="big num">{eur(data.spent)}</div>
@@ -72,7 +102,7 @@
           <span class:more={compare > 0} class:less={compare <= 0}>
             {compare > 0 ? "▲" : "▼"} {eur(Math.abs(compare))}
           </span>
-          <span class="muted">{compare > 0 ? "mehr" : "weniger"} als im {data.previous.period.label.split(" ")[0]} bis zum selben Tag</span>
+          <span class="muted">{compare > 0 ? "mehr" : "weniger"} als im {data.previous.period.label.split(" ")[0]}{isCurrent ? " bis zum selben Tag" : ""}</span>
         {/if}
       </div>
       <dl class="figures">
@@ -104,7 +134,7 @@
       {/if}
     </section>
 
-    <ForecastCard {onerror} />
+    {#if isCurrent}<ForecastCard {onerror} />{/if}
 
     <!-- 2. Kategorien -->
     <section class="card">
@@ -187,7 +217,13 @@
 
 <style>
   .reloading { opacity: .6; transition: opacity .2s; }
-  .hero .period { margin-bottom: 8px; }
+  .hero .period { display: flex; align-items: center; gap: 8px; margin: -4px 0 8px; color: var(--ink-2); }
+  .hero .period span { min-width: 7.5em; text-align: center; font-weight: 600; }
+  .nav { border: 0; background: var(--surface-2); color: var(--ink); width: 32px; height: 28px; border-radius: 8px;
+         cursor: pointer; font-size: 18px; line-height: 1; }
+  .nav:disabled { opacity: .35; cursor: default; }
+  .nav:focus-visible, .today:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .today { all: unset; margin-left: auto; color: var(--accent); cursor: pointer; }
   .hero .label { color: var(--ink-2); }
   .big { font-size: 48px; font-weight: 650; letter-spacing: -0.02em; line-height: 1.1; margin: 2px 0 6px;
          font-variant-numeric: normal; }

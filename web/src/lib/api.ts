@@ -97,7 +97,7 @@ export interface Status {
 export interface NetWorthPoint { date: string; value: number; not_converted: number }
 export interface TxLink { kind: string; status: string; evidence: string; other_id: number | null; other?: Tx }
 export interface Tx {
-  id: number; date: string; status: string; source: string; amount: number; currency: string;
+  id: number; date: string; budget_date: string | null; status: string; source: string; amount: number; currency: string;
   amount_eur: number | null; original_amount: number | null; original_currency: string | null;
   counterparty: string | null; description: string; counterparty_iban: string | null; mcc: string | null;
   apple_pay: boolean; note: string | null; role: string; excluded_by_user: boolean;

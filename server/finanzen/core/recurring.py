@@ -203,6 +203,7 @@ class Expected:
     interval: str
     key: str
     overdue: bool
+    category_id: Optional[int] = None
 
 
 def occurrences(r: Recurring, today: date, until: date, seen: list[Booking]) -> list[Expected]:
@@ -216,7 +217,7 @@ def occurrences(r: Recurring, today: date, until: date, seen: list[Booking]) -> 
         covered = any(b.id not in ids and b.date > r.last_date and group_key(b) == r.key
                       and abs((b.date - day).days) <= tol for b in seen)
         if not covered:
-            out.append(Expected(day, r.name, r.amount, r.role, r.interval, r.key, day < today))
+            out.append(Expected(day, r.name, r.amount, r.role, r.interval, r.key, day < today, r.category_id))
         day = next_after(day, r.interval)
     return out
 

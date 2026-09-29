@@ -50,7 +50,7 @@
 
 {#if open && data}
   <Sheet title="Bis {dayLongFmt(data.until)}" onclose={() => (open = false)}>
-    <p class="small muted intro">Kontostand heute, dazu vorgemerkte Umsätze und die regelmäßigen Buchungen, die bis dahin noch kommen. Das Gehalt am Beginn des nächsten Zeitraums ist nicht enthalten.</p>
+    <p class="small muted intro">Kontostand heute, dazu vorgemerkte Umsätze und die regelmäßigen Buchungen (auch das Gehalt), die bis zum Monatsende noch kommen.</p>
     {#each moving as a (a.id)}
       <section class="card">
         <h2>{a.name}</h2>

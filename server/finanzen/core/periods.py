@@ -1,9 +1,13 @@
-"""Budget periods: from salary to salary (or calendar months).
+"""Budget periods: calendar months (default) or from salary to salary.
 
-Period M nominally starts on the salary day of the previous month. A salary
-booking from 10 days before to 5 days after that nominal day moves the start
-to its booking date. A period is named after the month it mostly covers
-(salary on 28 Sep -> "Oktober").
+Calendar months: a salary booked in the last 10 days of a month counts for
+the next month (salary on 29 Sep is the money for October), see
+`budget_day`.
+
+Salary to salary (setting salary_day): period M nominally starts on the
+salary day of the previous month. A salary booking from 10 days before to 5
+days after that nominal day moves the start to its booking date. A period
+is named after the month it mostly covers (salary on 28 Sep -> "Oktober").
 """
 
 from __future__ import annotations
@@ -40,6 +44,15 @@ class Period:
 
     def contains(self, day: date) -> bool:
         return self.start <= day <= self.end
+
+
+def budget_day(day: date, is_salary: bool, calendar_months: bool) -> date:
+    """The day a booking counts for in budget periods."""
+    if not (is_salary and calendar_months):
+        return day
+    ny, nm = _next_month(day.year, day.month)
+    first_next = date(ny, nm, 1)
+    return first_next if (first_next - day).days <= EARLY_DAYS else day
 
 
 def _prev_month(year: int, month: int) -> tuple[int, int]:

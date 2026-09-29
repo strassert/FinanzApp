@@ -1,6 +1,6 @@
 from datetime import date
 
-from finanzen.core.periods import PeriodCalendar
+from finanzen.core.periods import PeriodCalendar, budget_day
 
 
 def test_nominal_period_without_salary():
@@ -52,3 +52,13 @@ def test_calendar_months_without_salary_day():
     cal = PeriodCalendar(None)
     p = cal.period_for(date(2026, 9, 28))
     assert (p.start, p.end, p.label) == (date(2026, 9, 1), date(2026, 9, 30), "September 2026")
+
+
+def test_budget_day_moves_late_salary_to_next_month():
+    assert budget_day(date(2026, 9, 29), True, True) == date(2026, 10, 1)
+    assert budget_day(date(2026, 9, 21), True, True) == date(2026, 10, 1)      # 10 days before the 1st
+    assert budget_day(date(2026, 9, 20), True, True) == date(2026, 9, 20)
+    assert budget_day(date(2026, 10, 1), True, True) == date(2026, 10, 1)      # "spätestens am 1."
+    assert budget_day(date(2026, 12, 30), True, True) == date(2027, 1, 1)
+    assert budget_day(date(2026, 9, 29), False, True) == date(2026, 9, 29)     # not a salary
+    assert budget_day(date(2026, 9, 29), True, False) == date(2026, 9, 29)     # salary-to-salary mode

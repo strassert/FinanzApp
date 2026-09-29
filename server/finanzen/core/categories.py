@@ -15,6 +15,7 @@ from typing import Optional
 from .db import utcnow
 
 TRANSFER = "Umbuchung"
+SALARY = "Gehalt"
 OTHER_EXPENSE = "Sonstiges"
 OTHER_INCOME = "Sonstige Einnahmen"
 

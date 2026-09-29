@@ -13,6 +13,8 @@
 - Vermögen: balances in EUR; a past day's balance is the latest balance minus
   the bookings since. Pending only if the balance type includes them.
   PayPal purchases paid directly by the bank do not move the PayPal balance.
+- Periods filter on tx_derived.budget_date (booking date, salary shifted
+  to the next month in calendar mode), see periods.budget_day.
 - Foreign amounts without a rate are left out and counted as not converted.
 """
 
@@ -27,18 +29,22 @@ from typing import Iterable, Optional
 from . import recurring
 from .db import get_setting
 from .fx import Rates
-from .periods import Period, PeriodCalendar
+from .periods import Period, PeriodCalendar, budget_day
 
 PENDING_BALANCE_TYPES = {"XPCD", "ITAV", "CLAV", "XPAV"}
 
 
+def salary_day(conn: sqlite3.Connection) -> Optional[int]:
+    """Setting salary_day: a day (salary-to-salary periods) or empty/0 (calendar months, default)."""
+    raw = get_setting(conn, "salary_day", "0")
+    return int(raw) if raw and raw.isdigit() and int(raw) > 0 else None
+
+
 def calendar(conn: sqlite3.Connection) -> PeriodCalendar:
-    raw = get_setting(conn, "salary_day", "29")
-    salary_day = int(raw) if raw and raw.isdigit() and int(raw) > 0 else None
     rows = conn.execute("""SELECT t.booking_date FROM transactions t JOIN tx_derived d ON d.tx_id=t.id
                            JOIN categories c ON c.id=d.category_id
                            WHERE d.role='income' AND c.name='Gehalt'""")
-    return PeriodCalendar(salary_day, [date.fromisoformat(r[0]) for r in rows])
+    return PeriodCalendar(salary_day(conn), [date.fromisoformat(r[0]) for r in rows])
 
 
 def period_dict(p: Period) -> dict:
@@ -71,7 +77,7 @@ def sums(conn: sqlite3.Connection, start: date, end: date,
           SUM(CASE WHEN d.role IN ('expense','income') AND d.amount_eur_minor IS NULL THEN 1 ELSE 0 END) AS nc,
           SUM(CASE WHEN d.role IN ('expense','income') AND t.status='pending' THEN 1 ELSE 0 END) AS pending
         FROM transactions t JOIN tx_derived d ON d.tx_id=t.id
-        WHERE t.booking_date BETWEEN ? AND ? {where}""",
+        WHERE d.budget_date BETWEEN ? AND ? {where}""",
                        [start.isoformat(), end.isoformat(), *args]).fetchone()
     return Sums(row["spent"], row["income"], row["nc"] or 0, row["pending"] or 0)
 
@@ -83,7 +89,7 @@ def by_category(conn: sqlite3.Connection, start: date, end: date,
     rows = conn.execute(f"""
         SELECT c.id, c.name, c.color_slot, {sign} * SUM(d.amount_eur_minor) AS amount, COUNT(*) AS n
         FROM transactions t JOIN tx_derived d ON d.tx_id=t.id JOIN categories c ON c.id=d.category_id
-        WHERE d.role=? AND d.amount_eur_minor IS NOT NULL AND t.booking_date BETWEEN ? AND ? {where}
+        WHERE d.role=? AND d.amount_eur_minor IS NOT NULL AND d.budget_date BETWEEN ? AND ? {where}
         GROUP BY c.id ORDER BY amount DESC""",
                         [role, start.isoformat(), end.isoformat(), *args]).fetchall()
     return [dict(r) for r in rows if r["amount"]]
@@ -93,7 +99,7 @@ def by_account(conn: sqlite3.Connection, start: date, end: date) -> list[dict]:
     rows = conn.execute("""
         SELECT a.id, a.name, a.kind, a.color_slot, -SUM(d.amount_eur_minor) AS amount, COUNT(*) AS n
         FROM transactions t JOIN tx_derived d ON d.tx_id=t.id JOIN accounts a ON a.id=t.account_id
-        WHERE d.role='expense' AND d.amount_eur_minor IS NOT NULL AND t.booking_date BETWEEN ? AND ?
+        WHERE d.role='expense' AND d.amount_eur_minor IS NOT NULL AND d.budget_date BETWEEN ? AND ?
         GROUP BY a.id ORDER BY amount DESC""", (start.isoformat(), end.isoformat())).fetchall()
     return [dict(r) for r in rows if r["amount"]]
 
@@ -150,6 +156,12 @@ def budget(conn: sqlite3.Connection, period: Period, today: date, s: Sums,
     current = period.contains(today)
     days_left = max(0, (period.end - today).days + 1) if current else 0
     expected = recurring.upcoming(conn, today, period.end, list(account_ids or [])) if current else []
+    # a salary expected at the end of the month counts for the next one (calendar months)
+    salary_ids = {r[0] for r in conn.execute("SELECT id FROM categories WHERE name='Gehalt'")}
+    calendar_months = salary_day(conn) is None
+    expected = [e for e in expected
+                if budget_day(e.date, e.role == "income" and e.category_id in salary_ids, calendar_months)
+                <= period.end]
     fixed = sum(e.amount for e in expected if e.role == "expense")
     income = sum(e.amount for e in expected if e.role == "income")
     remaining = s.income - s.spent + fixed + income
@@ -291,7 +303,7 @@ def sankey(conn: sqlite3.Connection, start: date, end: date) -> dict:
                -SUM(d.amount_eur_minor) AS amount
         FROM transactions t JOIN tx_derived d ON d.tx_id=t.id
         JOIN accounts a ON a.id=t.account_id JOIN categories c ON c.id=d.category_id
-        WHERE d.role='expense' AND d.amount_eur_minor IS NOT NULL AND t.booking_date BETWEEN ? AND ?
+        WHERE d.role='expense' AND d.amount_eur_minor IS NOT NULL AND d.budget_date BETWEEN ? AND ?
         GROUP BY a.id, c.id HAVING amount > 0""", (start.isoformat(), end.isoformat())).fetchall()
     spent_by_account: dict[int, int] = {}
     for r in rows:

@@ -15,7 +15,7 @@ TX_SELECT = """
            t.currency, t.original_amount_minor, t.original_currency, t.counterparty,
            t.counterparty_iban, t.description, t.mcc, t.apple_pay, t.card, t.note,
            t.user_category_id, t.user_excluded,
-           d.role, d.category_id, d.category_source, d.amount_eur_minor,
+           d.role, d.category_id, d.category_source, d.amount_eur_minor, d.budget_date,
            c.name AS category_name, c.color_slot AS category_slot, c.kind AS category_kind,
            a.name AS account_name, a.kind AS account_kind, a.color_slot AS account_slot
     FROM transactions t
@@ -27,7 +27,8 @@ TX_SELECT = """
 
 def _tx_json(r: sqlite3.Row, links: Optional[list] = None) -> dict:
     return {
-        "id": r["id"], "date": r["booking_date"], "status": r["status"], "source": r["source"],
+        "id": r["id"], "date": r["booking_date"], "budget_date": r["budget_date"],
+        "status": r["status"], "source": r["source"],
         "amount": r["amount_minor"], "currency": r["currency"], "amount_eur": r["amount_eur_minor"],
         "original_amount": r["original_amount_minor"], "original_currency": r["original_currency"],
         "counterparty": r["counterparty"], "description": r["description"],
@@ -48,10 +49,10 @@ def list_transactions(conn: sqlite3.Connection, *, start: Optional[date] = None,
                       query: Optional[str] = None, limit: int = 100, offset: int = 0) -> dict:
     where, args = ["1=1"], []
     if start:
-        where.append("t.booking_date >= ?")
+        where.append("d.budget_date >= ?")
         args.append(start.isoformat())
     if end:
-        where.append("t.booking_date <= ?")
+        where.append("d.budget_date <= ?")
         args.append(end.isoformat())
     if account_ids:
         where.append(f"t.account_id IN ({','.join('?' * len(account_ids))})")
