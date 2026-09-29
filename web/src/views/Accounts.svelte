@@ -181,6 +181,7 @@
 <section class="card">
   <h2>Weiteres</h2>
   <ul class="rows">
+    <li><a class="row" href="#/fixkosten"><span class="grow">Fixkosten und regelmäßige Zahlungen</span><span class="muted">›</span></a></li>
     <li><button class="row" onclick={() => go("kategorien")}><span class="grow">Kategorien und Regeln</span><span class="muted">›</span></button></li>
     <li><button class="row" disabled={demo} onclick={() => (importing = true)}><span class="grow">Datei importieren (CSV, Excel)</span><span class="muted">›</span></button></li>
     <li><a class="row" href="#/applepay"><span class="grow">Apple Pay sofort erfassen</span><span class="muted">›</span></a></li>

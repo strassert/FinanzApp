@@ -244,6 +244,34 @@ er nach dem Monat, den er großteils abdeckt (Gehalt am 28. Sep → „Oktober�
 - **Fremdwährungen:** EZB-Referenzkurs des Buchungsdatums; ohne Kurs nicht
   in Summen, sondern als „nicht umgerechnet“ gezählt.
 
+### Fixkosten (regelmäßige Zahlungen)
+
+Gebuchte Ausgaben und Einnahmen (keine Umbuchungen) werden je Konto,
+Richtung und Empfänger gruppiert. Der Empfänger ist die Gegenseite, sonst
+der Buchungstext ohne Ziffern. Innerhalb einer Gruppe bilden Buchungen eine
+Reihe, wenn der Betrag höchstens 25 % vom letzten der Reihe abweicht. So
+bleiben Gehalt und Urlaubszuschuss getrennt.
+
+| Rhythmus | Abstand | mind. Buchungen |
+| --- | --- | --- |
+| wöchentlich | 7 ± 2 Tage | 3 |
+| monatlich | 30 ± 5 Tage | 3 |
+| vierteljährlich | 91 ± 12 Tage | 2 |
+| halbjährlich | 182 ± 15 Tage | 2 |
+| jährlich | 365 ± 20 Tage | 2 |
+
+Mindestens 75 % der Abstände müssen passen. Eine Reihe aus nur zwei
+Buchungen zählt nur, wenn an den Empfänger sonst nichts ging und der Betrag
+höchstens 5 % abweicht. Beendet ist eine Reihe, wenn die nächste Buchung
+länger als einen Rhythmus überfällig ist.
+
+- **Erwarteter Betrag:** Median der letzten drei Buchungen. War der Betrag
+  davor gleich und ändert sich mit der letzten Buchung, gilt der neue Betrag
+  (Preisänderung; der alte wird angezeigt).
+- **Pro Monat:** Betrag × Buchungen pro Jahr / 12.
+- **„Keine Fixkosten“:** wird je Empfänger gespeichert und übersteht jede
+  Neuberechnung.
+
 ### Vorgemerkte Umsätze und Apple Pay
 
 Vorgemerkte Umsätze, die beim nächsten Abruf fehlen, werden durch die

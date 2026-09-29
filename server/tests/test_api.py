@@ -188,3 +188,12 @@ def test_import_endpoints(client, conn):
     pdf = client.post("/api/import/preview", data={"account_id": str(aid), "file": (io.BytesIO(b"%PDF-1.4"), "a.pdf")},
                       content_type="multipart/form-data")
     assert pdf.status_code == 422 and "CSV" in pdf.get_json()["error"]
+
+
+def test_recurring_list_and_reject(client):
+    data = client.get("/api/recurring").get_json()
+    rent = next(i for i in data["items"] if i["name"] == "Hausverwaltung Sonnenhof")
+    r = client.post("/api/recurring/decision", json={"key": rent["key"], "decision": "rejected"})
+    assert r.status_code == 200
+    assert rent["key"] in {i["key"] for i in r.get_json()["rejected"]}
+    assert client.post("/api/recurring/decision", json={"key": rent["key"], "decision": "x"}).status_code == 400

@@ -18,7 +18,7 @@ from ..auth import check_token
 from ..bank import BankError, BankProvider, PsuHeaders
 from ..config import Config
 from ..core import db as core_db
-from ..core import importer, queries, reports, wallet
+from ..core import importer, queries, recurring, reports, wallet
 from ..core.recompute import recompute
 from ..core.store import create_manual_account, store_balance
 
@@ -194,6 +194,22 @@ def create_app(cfg: Config, conn: Optional[sqlite3.Connection] = None,
                 s = reports.sums(conn, p.start, p.end)
                 timeline.append({**reports.period_dict(p), "spent": s.spent, "income": s.income})
         return jsonify({"sankey": reports.sankey(conn, start, end), "timeline": timeline})
+
+    @app.get("/api/recurring")
+    def recurring_list():
+        return jsonify(recurring.overview(conn, today()))
+
+    @app.post("/api/recurring/decision")
+    def recurring_decide():
+        data = body()
+        key = data.get("key")
+        if not isinstance(key, str) or not key:
+            raise ApiError(400, "key fehlt.")
+        try:
+            recurring.decide(conn, key, data.get("decision"))
+        except ValueError:
+            raise ApiError(400, "Ungültige Entscheidung.")
+        return jsonify(recurring.overview(conn, today()))
 
     # --- transactions -----------------------------------------------------------------
 

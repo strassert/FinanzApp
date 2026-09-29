@@ -112,3 +112,14 @@ export interface Explore {
   sankey: { nodes: SankeyNode[]; links: SankeyLink[]; income: number; spent: number; start: string; end: string };
   timeline: (Period & { spent: number; income: number })[];
 }
+export type Interval = "weekly" | "monthly" | "quarterly" | "halfyearly" | "yearly";
+export interface RecurringItem {
+  key: string; name: string; role: "expense" | "income"; interval: Interval;
+  amount: number; previous_amount: number | null; monthly: number;
+  last_date: string; next_date: string; overdue: boolean; count: number; tx_ids: number[];
+  category: { id: number | null; name: string | null; color_slot: number | null };
+  account: { id: number; name: string | null; color_slot: number | null };
+}
+export interface Recurring {
+  items: RecurringItem[]; rejected: RecurringItem[]; monthly_expense: number; monthly_income: number;
+}

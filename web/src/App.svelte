@@ -8,6 +8,7 @@
   import Categories from "./views/Categories.svelte";
   import Pair from "./views/Pair.svelte";
   import ApplePay from "./views/ApplePay.svelte";
+  import FixedCosts from "./views/FixedCosts.svelte";
 
   let status = $state<Status | null>(null);
   let error = $state<string | null>(null);
@@ -53,6 +54,7 @@
   ];
   const titles: Record<string, string> = {
     "": "Finanzen", umsaetze: "Umsätze", erkunden: "Erkunden", konten: "Konten", kategorien: "Kategorien",
+    fixkosten: "Fixkosten",
   };
 </script>
 
@@ -96,6 +98,8 @@
       <Accounts onerror={handle} demo={status?.demo ?? false} onchange={loadStatus} />
     {:else if route.path === "applepay"}
       <ApplePay onerror={handle} demo={status?.demo ?? false} />
+    {:else if route.path === "fixkosten"}
+      <FixedCosts onerror={handle} demo={status?.demo ?? false} />
     {:else if route.path === "kategorien"}
       <Categories onerror={handle} demo={status?.demo ?? false} />
     {:else}

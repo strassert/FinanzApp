@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { api, query, type NetWorthPoint, type Overview } from "../lib/api";
-  import { eur, percent } from "../lib/format";
+  import { api, query, type NetWorthPoint, type Overview, type Recurring } from "../lib/api";
+  import { day, eur, percent, signed } from "../lib/format";
   import { slotVar } from "../lib/colors";
   import { go } from "../lib/router.svelte";
   import BarList from "../components/BarList.svelte";
@@ -14,6 +14,7 @@
   let range = $state("1J");
   let worth = $state<NetWorthPoint[]>([]);
   let loading = $state(false);
+  let fixed = $state<Recurring | null>(null);
 
   async function load() {
     loading = true;
@@ -34,6 +35,15 @@
     }
   }
 
+  async function loadFixed() {
+    try {
+      fixed = await api.get<Recurring>("/api/recurring");
+    } catch (e) {
+      onerror(e);
+    }
+  }
+  loadFixed();
+
   $effect(() => { void cards; load(); });
   $effect(() => { void range; loadWorth(); });
 
@@ -43,6 +53,8 @@
 
   const compare = $derived(data ? data.spent - data.previous.spent_same_day : 0);
   const accountsTotal = $derived(data ? data.accounts.reduce((s, a) => s + (a.balance_eur ?? 0), 0) : 0);
+  const nextFixed = $derived(fixed ? [...fixed.items].filter((i) => i.role === "expense")
+    .sort((a, b) => a.next_date.localeCompare(b.next_date)).slice(0, 3) : []);
   const RANGES = ["1M", "3M", "6M", "1J", "3J", "Alles"];
 </script>
 
@@ -93,6 +105,26 @@
       <BarList items={data.categories.map((c) => ({ id: c.id, label: c.name, amount: c.amount, slot: c.color_slot }))}
                onselect={(id) => go("umsaetze", { period: data!.period.key, kategorie: id ?? undefined })} />
     </section>
+
+    <!-- Fixkosten -->
+    {#if fixed?.items.length}
+      <section class="card">
+        <a class="more-link" href="#/fixkosten">
+          <h2>Fixkosten</h2>
+          <span class="small muted">Alle ›</span>
+        </a>
+        <div class="fixed-total"><span class="num">{eur(fixed.monthly_expense)}</span><span class="small muted">pro Monat</span></div>
+        <ul class="accounts">
+          {#each nextFixed as i (i.key + i.amount)}
+            <li>
+              <span class="when small muted">{day(i.next_date)}</span>
+              <span class="name">{i.name}</span>
+              <span class="num">{signed(i.amount)}</span>
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
 
     <!-- 3. nach Karte -->
     {#if data.cards.length}
@@ -165,4 +197,8 @@
   .accounts .name { flex: 1; min-width: 0; }
   .accounts .total { font-weight: 600; }
   .skeleton { color: var(--muted); }
+  .more-link { display: flex; justify-content: space-between; align-items: baseline; color: inherit; text-decoration: none; }
+  .fixed-total { display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; }
+  .fixed-total .num { font-size: 24px; font-weight: 650; }
+  .when { width: 52px; flex: none; }
 </style>
