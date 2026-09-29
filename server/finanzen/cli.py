@@ -118,6 +118,7 @@ def cmd_sync(cfg: Config, args) -> int:
     results = sync.sync_all(conn, provider, trigger="schedule")
     for r in results:
         print(f"connection {r.connection_id}: {r.status} ({r.new_count} neu) {r.message}")
+    _categorize(cfg, conn)
     return 0 if all(r.status in ("ok", "skipped", "expired") for r in results) else 2
 
 
@@ -145,6 +146,29 @@ def cmd_quotes(cfg: Config, args) -> int:
     return 0
 
 
+def _categorize(cfg: Config, conn) -> Optional[int]:
+    """KI stage B after new data; recomputes when the model categorised something."""
+    from .core import ai
+    from .core.recompute import recompute
+    found = ai.run_safely(conn, cfg.anthropic_key_path, cfg.ai_model)
+    if found:
+        recompute(conn)
+    return found
+
+
+def cmd_categorize(cfg: Config, args) -> int:
+    from .core import ai
+    if ai.client_from_key_file(cfg.anthropic_key_path) is None:
+        print(f"Kein API-Schlüssel: {cfg.anthropic_key_path}", file=sys.stderr)
+        return 1
+    found = _categorize(cfg, _conn(cfg))
+    if found is None:
+        print("Sprachmodell nicht erreichbar oder Fehler (siehe Log).", file=sys.stderr)
+        return 2
+    print(f"{found} Händler vom Sprachmodell eingeordnet")
+    return 0
+
+
 def cmd_fx(cfg: Config, args) -> int:
     from .core import fx
     from .core.recompute import recompute
@@ -163,6 +187,12 @@ def cmd_check(cfg: Config, args) -> int:
         print(("OK    " if good else "FEHLT ") + text)
 
     report(bool(cfg.public_url.startswith("https://")), f"public_url (HTTPS): {cfg.public_url or '-'}")
+    ai_key = Path(cfg.anthropic_key_path)
+    if ai_key.is_file():
+        mode = ai_key.stat().st_mode & 0o777
+        report(mode & 0o077 == 0, f"KI-Schlüssel {ai_key}, Rechte 600 (ist {oct(mode)})")
+    else:
+        print(f"INFO  kein KI-Schlüssel ({ai_key}): Sprachmodell aus")
     if cfg.bank == "fake":
         report(True, "Bank: Fake (Entwicklung)")
         return 0
@@ -248,6 +278,7 @@ def main(argv=None) -> int:
     sub.add_parser("sync")
     sub.add_parser("fx")
     sub.add_parser("quotes")
+    sub.add_parser("categorize")
     p = sub.add_parser("backup")
     p.add_argument("--dir", help="Zielverzeichnis (Standard: backup_dir aus der Konfiguration)")
     p.add_argument("--keep", type=int, default=14)
@@ -255,5 +286,6 @@ def main(argv=None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     cfg = load(args.config)
     handler = {"serve": cmd_serve, "demo": cmd_demo, "check": cmd_check, "token": cmd_token,
-               "pair": cmd_pair, "sync": cmd_sync, "fx": cmd_fx, "quotes": cmd_quotes, "backup": cmd_backup}[args.command]
+               "pair": cmd_pair, "sync": cmd_sync, "fx": cmd_fx, "quotes": cmd_quotes, "backup": cmd_backup,
+               "categorize": cmd_categorize}[args.command]
     return handler(cfg, args)

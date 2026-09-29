@@ -165,6 +165,7 @@ pc$ scripts/verify-backup.sh /pfad/zur/omv-freigabe/finanzen finanzen-backup-key
 | Abrufe 06:30 und 18:30 | `systemctl list-timers finanzen-sync.timer`, Log: `journalctl -u finanzen-sync` |
 | Dienst | `systemctl status finanzen`, `journalctl -u finanzen` |
 | Manuell abrufen | `sudo -u finanzen finanzen sync` |
+| KI-Einordnung neuer Händler (läuft mit jedem Abruf) | `sudo -u finanzen finanzen categorize`; Schlüssel prüfen: `finanzen check` |
 | Kurse und Depotwert (läuft mit jedem Abruf) | `sudo -u finanzen finanzen quotes`; Symbole unter `[quotes]` in `/etc/finanzen/config.toml` |
 | Demo (erfundene Daten) | `https://finanzen.<tailnet>.ts.net:8443/` |
 
@@ -231,6 +232,17 @@ andere Kategorie gilt dann für alle Buchungen dieses Händlers
   das bei gelernten Händlern nur in einer Kategorie vorkommt und insgesamt
   bei höchstens 6 Händlern (Ortsnamen wie „Salzburg“ zählen so nie).
   Widersprechen sich zwei Wörter, gibt es keinen Vorschlag.
+- *Sprachmodell* (`core/ai.py`, Claude Haiku 4.5 über die Anthropic-API):
+  läuft nach jedem Abruf und mit `finanzen categorize`, nie während der
+  Neuberechnung. Gefragt wird einmal je Händler, der noch „Sonstiges“ ist
+  oder nur über den Kartencode zugeordnet wurde, in Paketen zu 50.
+  Geschickt werden nur der Händlertext ohne lange Ziffernfolgen, der
+  Kartencode und die Namen deiner Ausgabenkategorien; nie Beträge, Daten,
+  IBANs, Notizen, Einnahmen, Umbuchungen oder Überweisungen an
+  Privatpersonen (IBAN ohne Firmenzusatz wie GmbH, AG, Versicherung).
+  „Unsicher“ bleibt „Sonstiges“ und wird nicht erneut gefragt. Ohne
+  Schlüsseldatei `/etc/finanzen/anthropic.key` (Rechte 600, Besitzer
+  `finanzen`) ist die Stufe aus; Fehler brechen den Abruf nie ab.
 
 ### Budget-Zeitraum
 

@@ -41,8 +41,9 @@ def create_app(cfg: Config, conn: Optional[sqlite3.Connection] = None,
     app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
     app.config["CFG"] = cfg
     conn = conn or core_db.connect(cfg.db_path)
-    if conn.execute("SELECT 1 FROM tx_derived WHERE budget_date IS NULL LIMIT 1").fetchone():
-        recompute(conn)               # derived data from before migration 004
+    if conn.execute("SELECT 1 FROM tx_derived WHERE budget_date IS NULL OR (merchant_key IS NULL "
+                    "AND role IN ('expense','income')) LIMIT 1").fetchone():
+        recompute(conn)               # derived data from before migrations 004/005
     lock = threading.RLock()          # one SQLite connection, serialised access
 
     def today() -> date:

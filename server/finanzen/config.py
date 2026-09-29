@@ -27,6 +27,8 @@ class Config:
     backup_dir: str = "/mnt/backup/finanzen"
     backup_recipient_file: str = "/etc/finanzen/backup-recipient.txt"   # age public key(s)
     quotes: dict[str, str] = field(default_factory=dict)                 # ISIN -> quote symbol (EUR)
+    anthropic_key_path: str = "/etc/finanzen/anthropic.key"            # KI stage B; missing file = off
+    ai_model: str = "claude-haiku-4-5"
 
     @property
     def redirect_url(self) -> str:

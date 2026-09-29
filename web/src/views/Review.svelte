@@ -36,6 +36,7 @@
     }
   }
 
+  const sameName = (item: ReviewItem) => !item.hint || item.hint.trim().toLowerCase() === item.name.toLowerCase();
   const choices = (item: ReviewItem) =>
     categories.filter((c) => c.kind === (item.key.startsWith("+:") ? "income" : "expense"));
 </script>
@@ -53,7 +54,7 @@
             <span class="name">{item.name}</span>
             <span class="small muted">
               {item.category.name} <span class="ki">KI</span>
-              · {item.source === "learned" && item.hint ? `gelernt von „${item.hint}“` : "Sprachmodell"}
+              · {item.source === "ai" ? "Sprachmodell" : sameName(item) ? "wie du es einmal zugeordnet hast" : `gelernt von „${item.hint}“`}
             </span>
             <span class="small muted">{item.count} {item.count === 1 ? "Buchung" : "Buchungen"}, zuletzt {day(item.last_date)} · {signed(item.total)}</span>
           </span>

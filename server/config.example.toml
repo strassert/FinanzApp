@@ -17,6 +17,11 @@ private_key_path = "/etc/finanzen/enablebanking.pem"
 backup_dir = "/mnt/backup/finanzen"             # OMV share, bind-mounted into the container
 backup_recipient_file = "/etc/finanzen/backup-recipient.txt"
 
+# KI categorisation (stage B): Anthropic API key in its own file (mode 600,
+# owner finanzen). Without the file the language model is simply not used.
+# anthropic_key_path = "/etc/finanzen/anthropic.key"
+# ai_model = "claude-haiku-4-5"
+
 # Daily prices for depot positions (ISIN -> symbol with EUR prices, Yahoo Finance).
 # Holdings come from the broker export (Konten -> Datei importieren).
 [quotes]
