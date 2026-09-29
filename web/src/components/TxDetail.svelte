@@ -82,7 +82,7 @@
       <select value={tx.category.id} disabled={demo} onchange={(e) => setCategory(e.currentTarget.value)} aria-label="Kategorie">
         {#each categories as c}<option value={c.id}>{c.name}</option>{/each}
       </select>
-      <p class="small muted">Erkannt: {CATEGORY_SOURCE[tx.category.source] ?? tx.category.source}</p>
+      <p class="small muted">Erkannt: {CATEGORY_SOURCE[tx.category.source] ?? tx.category.source}{#if tx.category.hint} (wie „{tx.category.hint}“){/if}</p>
       <label class="check"><input type="checkbox" bind:checked={makeRule} disabled={demo} />
         Auch künftig so zuordnen, wenn der Text enthält:</label>
       {#if makeRule}<input type="text" bind:value={rulePattern} aria-label="Muster für die Regel" />{/if}

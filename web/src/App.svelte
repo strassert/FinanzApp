@@ -9,6 +9,7 @@
   import Pair from "./views/Pair.svelte";
   import ApplePay from "./views/ApplePay.svelte";
   import FixedCosts from "./views/FixedCosts.svelte";
+  import Review from "./views/Review.svelte";
 
   let status = $state<Status | null>(null);
   let error = $state<string | null>(null);
@@ -54,7 +55,7 @@
   ];
   const titles: Record<string, string> = {
     "": "Finanzen", umsaetze: "Umsätze", erkunden: "Erkunden", konten: "Konten", kategorien: "Kategorien",
-    fixkosten: "Fixkosten",
+    fixkosten: "Fixkosten", pruefen: "KI-Vorschläge",
   };
 </script>
 
@@ -80,6 +81,11 @@
         {:else}{w.institution}: Abruf fehlgeschlagen.{/if}
       </button>
     {/each}
+    {#if status.review && route.path !== "pruefen"}
+      <button class="banner" onclick={() => go("pruefen")}>
+        {status.review} {status.review === 1 ? "KI-Vorschlag" : "KI-Vorschläge"} prüfen
+      </button>
+    {/if}
     {#if status.suggestions}
       <button class="banner" onclick={() => go("umsaetze", { vorschlaege: 1 })}>
         {status.suggestions} {status.suggestions === 1 ? "Verknüpfung" : "Verknüpfungen"} zu prüfen
@@ -98,6 +104,8 @@
       <Accounts onerror={handle} demo={status?.demo ?? false} onchange={loadStatus} />
     {:else if route.path === "applepay"}
       <ApplePay onerror={handle} demo={status?.demo ?? false} />
+    {:else if route.path === "pruefen"}
+      <Review onerror={handle} demo={status?.demo ?? false} onchange={loadStatus} />
     {:else if route.path === "fixkosten"}
       <FixedCosts onerror={handle} demo={status?.demo ?? false} />
     {:else if route.path === "kategorien"}

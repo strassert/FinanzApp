@@ -1,7 +1,9 @@
 """Categories: built-in list, keywords for local merchants, MCC mapping.
 
-Precedence (see README): user choice -> transfer -> user rules -> built-in
-keywords -> card MCC -> "Sonstiges" / "Sonstige Einnahmen".
+Precedence (see README): user choice -> transfer -> user rules -> confirmed
+merchant -> learned from the same merchant -> built-in keywords -> learned
+from a distinctive word -> language model -> card MCC -> "Sonstiges" /
+"Sonstige Einnahmen". "learned" and "ai" are suggestions (core.learn, core.ai).
 """
 
 from __future__ import annotations
@@ -122,6 +124,19 @@ def fold(text: str) -> str:
     return "".join(c for c in decomposed if not unicodedata.combining(c))
 
 
+def payee_key(counterparty: str, description: str) -> str:
+    """Normalised payee: counterparty, else booking text; no digits or punctuation."""
+    text = fold(counterparty or description)
+    text = re.sub(r"[^A-Z& ]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def merchant_key(amount_minor: int, counterparty: str, description: str) -> str:
+    """Key per merchant and direction; empty when the text has no letters."""
+    payee = payee_key(counterparty, description)
+    return f"{'+' if amount_minor > 0 else '-'}:{payee}" if payee else ""
+
+
 def _norm(text: str) -> str:
     return " " + re.sub(r"\s+", " ", fold(text)) + " "
 
@@ -150,15 +165,27 @@ def add_rule(conn: sqlite3.Connection, pattern: str, category_id: int) -> int:
 
 
 class Categorizer:
-    def __init__(self, conn: sqlite3.Connection):
+    def __init__(self, conn: sqlite3.Connection, learner=None):
+        """learner: core.learn.Learner or None (first pass of the recomputation)."""
         self.ids = ids_by_name(conn)
         self.kinds = {r["id"]: r["kind"] for r in conn.execute("SELECT id, kind FROM categories")}
         self.rules = load_rules(conn)
+        self.learner = learner
+        self.confirmed = {r["key"]: r["category_id"] for r in conn.execute(
+            "SELECT key, category_id FROM merchant_categories")}
+        self.ai = {r["key"]: r["category_id"] for r in conn.execute(
+            "SELECT key, category_id FROM ai_categories WHERE category_id IS NOT NULL")}
+        self.hint: Optional[str] = None   # merchant a "learned" category came from
+
+    def _fits(self, category_id: Optional[int], income: bool) -> bool:
+        return self.kinds.get(category_id) == ("income" if income else "expense")
 
     def categorize(self, *, amount_minor: int, text: str, mcc: Optional[str],
                    user_category_id: Optional[int] = None,
-                   is_transfer: bool = False) -> tuple[int, str]:
-        """Return (category_id, source)."""
+                   is_transfer: bool = False, key: str = "", payee: str = "") -> tuple[int, str]:
+        """Return (category_id, source). key/payee: merchant key and payee text
+        for the merchant-based steps; `hint` is set for learned categories."""
+        self.hint = None
         if user_category_id is not None:
             return user_category_id, "user"
         if is_transfer:
@@ -168,10 +195,24 @@ class Categorizer:
         for rule in self.rules:
             if rule.pattern and fold(rule.pattern.strip()) in hay:
                 return rule.category_id, "rule"
+        if key and self._fits(self.confirmed.get(key), income):
+            return self.confirmed[key], "confirmed"
+        if key and self.learner:
+            guess = self.learner.same_merchant(key)
+            if guess and self._fits(guess.category_id, income):
+                self.hint = guess.hint
+                return guess.category_id, "learned"
         wanted = "income" if income else "expense"
         for keyword, name in KEYWORDS:
             if self.kinds.get(self.ids.get(name)) == wanted and _contains(hay, keyword):
                 return self.ids[name], "keyword"
+        if key and self.learner:
+            guess = self.learner.by_word(key, payee)
+            if guess and self._fits(guess.category_id, income):
+                self.hint = guess.hint
+                return guess.category_id, "learned"
+        if key and self._fits(self.ai.get(key), income):
+            return self.ai[key], "ai"
         if mcc and not income:
             try:
                 code = int(mcc)

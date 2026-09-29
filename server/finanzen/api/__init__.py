@@ -155,6 +155,8 @@ def create_app(cfg: Config, conn: Optional[sqlite3.Connection] = None,
             "version": __version__, "demo": cfg.demo, "today": today().isoformat(),
             "last_sync_at": last, "warnings": warnings,
             "suggestions": conn.execute("SELECT COUNT(*) FROM links WHERE status='suggested'").fetchone()[0],
+            "review": conn.execute("SELECT COUNT(DISTINCT merchant_key) FROM tx_derived WHERE category_source "
+                                   "IN ('learned','ai') AND merchant_key IS NOT NULL").fetchone()[0],
             "unassigned_wallet": conn.execute(
                 "SELECT COUNT(*) FROM wallet_events WHERE status='unassigned'").fetchone()[0],
         })
@@ -277,6 +279,22 @@ def create_app(cfg: Config, conn: Optional[sqlite3.Connection] = None,
             raise ApiError(400, "Ungültige Entscheidung.")
         recompute(conn)
         return jsonify({"ok": True})
+
+    # --- KI suggestions per merchant ------------------------------------------------
+
+    @app.get("/api/review")
+    def review_list():
+        return jsonify({"items": queries.review(conn)})
+
+    @app.post("/api/review")
+    def review_decide():
+        data = body()
+        try:
+            queries.decide_merchant(conn, str(data["key"]), int(data["category_id"]))
+        except (KeyError, TypeError, ValueError):
+            raise ApiError(400, "Ungültige Entscheidung.")
+        recompute(conn)
+        return jsonify({"items": queries.review(conn)})
 
     # --- categories and rules -------------------------------------------------------
 

@@ -15,7 +15,7 @@ TX_SELECT = """
            t.currency, t.original_amount_minor, t.original_currency, t.counterparty,
            t.counterparty_iban, t.description, t.mcc, t.apple_pay, t.card, t.note,
            t.user_category_id, t.user_excluded,
-           d.role, d.category_id, d.category_source, d.amount_eur_minor, d.budget_date,
+           d.role, d.category_id, d.category_source, d.amount_eur_minor, d.budget_date, d.category_hint,
            c.name AS category_name, c.color_slot AS category_slot, c.kind AS category_kind,
            a.name AS account_name, a.kind AS account_kind, a.color_slot AS account_slot
     FROM transactions t
@@ -36,7 +36,7 @@ def _tx_json(r: sqlite3.Row, links: Optional[list] = None) -> dict:
         "mcc": r["mcc"], "apple_pay": bool(r["apple_pay"]), "note": r["note"],
         "role": r["role"], "excluded_by_user": bool(r["user_excluded"]),
         "category": {"id": r["category_id"], "name": r["category_name"], "color_slot": r["category_slot"],
-                     "source": r["category_source"], "kind": r["category_kind"]},
+                     "source": r["category_source"], "kind": r["category_kind"], "hint": r["category_hint"]},
         "account": {"id": r["account_id"], "name": r["account_name"], "kind": r["account_kind"],
                     "color_slot": r["account_slot"]},
         "links": links or [],
@@ -130,6 +130,44 @@ def decide(conn: sqlite3.Connection, kind: str, a_id: int, b_id: int, decision: 
         raise ValueError("invalid decision")
     conn.execute("INSERT OR REPLACE INTO link_decisions (kind, a_id, b_id, decision, decided_at) "
                  "VALUES (?,?,?,?,?)", (kind, a_id, b_id, decision, utcnow()))
+
+
+REVIEW_SOURCES = ("learned", "ai")
+
+
+def review(conn: sqlite3.Connection) -> list[dict]:
+    """KI suggestions grouped by merchant, newest first."""
+    rows = conn.execute(f"""
+        SELECT d.merchant_key AS key, d.category_id, d.category_source AS source, d.category_hint AS hint,
+               c.name AS category_name, c.color_slot, t.counterparty, t.description, t.booking_date,
+               d.amount_eur_minor
+        FROM tx_derived d JOIN transactions t ON t.id=d.tx_id JOIN categories c ON c.id=d.category_id
+        WHERE d.category_source IN ({",".join("?" * len(REVIEW_SOURCES))}) AND d.merchant_key IS NOT NULL
+          AND t.removed_at IS NULL
+        ORDER BY t.booking_date DESC, t.id DESC""", REVIEW_SOURCES).fetchall()
+    out: dict[str, dict] = {}
+    for r in rows:
+        item = out.get(r["key"])
+        if item is None:
+            item = out[r["key"]] = {
+                "key": r["key"], "name": (r["counterparty"] or r["description"] or "").strip(),
+                "category": {"id": r["category_id"], "name": r["category_name"], "color_slot": r["color_slot"]},
+                "source": r["source"], "hint": r["hint"], "count": 0, "total": 0,
+                "last_date": r["booking_date"],
+            }
+        item["count"] += 1
+        item["total"] += r["amount_eur_minor"] or 0
+    return list(out.values())
+
+
+def decide_merchant(conn: sqlite3.Connection, key: str, category_id: int) -> None:
+    """The user's category for every booking of a merchant ("Passt" / "Ändern")."""
+    row = conn.execute("SELECT kind FROM categories WHERE id=?", (category_id,)).fetchone()
+    wanted = "income" if key.startswith("+:") else "expense"
+    if not key[2:] or key[:2] not in ("+:", "-:") or row is None or row["kind"] != wanted:
+        raise ValueError("invalid merchant decision")
+    conn.execute("INSERT OR REPLACE INTO merchant_categories (key, category_id, decided_at) VALUES (?,?,?)",
+                 (key, category_id, utcnow()))
 
 
 def list_categories(conn: sqlite3.Connection) -> list[dict]:

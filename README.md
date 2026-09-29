@@ -215,7 +215,22 @@ jeder Kauf genau einmal und beim richtigen Konto.
 ### Kategorien
 
 Vorrang: Wahl des Nutzers → Umbuchung → eigene Händler-Regeln →
-eingebaute Schlagwörter → MCC der Karte → „Sonstiges“.
+bestätigter Händler → **gelernt vom selben Händler** → eingebaute
+Schlagwörter → **gelernt über ein Wort** → **Sprachmodell** → MCC der Karte →
+„Sonstiges“.
+
+**KI-Einordnung.** Fett gedruckt sind Vorschläge; die App markiert sie mit
+„KI“ und listet sie unter „KI-Vorschläge prüfen“ je Händler (Händler =
+Richtung + Gegenseite bzw. Buchungstext ohne Ziffern). „Passt“ oder eine
+andere Kategorie gilt dann für alle Buchungen dieses Händlers
+(„bestätigter Händler“, übersteht jede Neuberechnung).
+
+- *Gelernt* (lokal, `core/learn.py`): aus allen Buchungen mit deiner Wahl,
+  Regel oder Bestätigung. Derselbe Händler bekommt die Kategorie, die du ihm
+  am häufigsten gegeben hast. Sonst entscheidet ein Wort im Händlernamen,
+  das bei gelernten Händlern nur in einer Kategorie vorkommt und insgesamt
+  bei höchstens 6 Händlern (Ortsnamen wie „Salzburg“ zählen so nie).
+  Widersprechen sich zwei Wörter, gibt es keinen Vorschlag.
 
 ### Budget-Zeitraum
 

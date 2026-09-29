@@ -144,6 +144,7 @@
               <span class="title">{title(t)}</span>
               <span class="sub small muted">
                 {t.category.name} · {t.account.name}
+                {#if t.category.source === "learned" || t.category.source === "ai"}<span class="tag ki">KI</span>{/if}
                 {#if t.status === "pending"}<span class="tag">vorgemerkt</span>{/if}
                 {#if t.budget_date && t.budget_date.slice(0, 7) !== t.date.slice(0, 7)}<span class="tag">zählt für {monthShort(t.budget_date.slice(0, 7))}</span>{/if}
                 {#if t.apple_pay}<span class="tag">Apple Pay</span>{/if}
@@ -201,6 +202,7 @@
   .text { flex: 1; min-width: 0; display: grid; }
   .title, .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tag { background: var(--surface-2); border-radius: 6px; padding: 0 5px; margin-left: 4px; font-size: 11px; color: var(--ink-2); }
+  .tag.ki { color: var(--s4); background: color-mix(in srgb, var(--s4) 14%, transparent); font-weight: 700; }
   .amount { text-align: right; font-weight: 600; white-space: nowrap; display: grid; }
   .amount.pos { color: var(--good); }
   .eur { font-weight: 400; }

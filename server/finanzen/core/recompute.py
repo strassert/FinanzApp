@@ -9,6 +9,7 @@ from datetime import date
 from . import categories as cat
 from .db import get_setting, transaction
 from .fx import Rates
+from .learn import Example, Learner
 from .linking import Account, Tx, link_all
 from .periods import budget_day
 
@@ -42,15 +43,32 @@ def recompute(conn: sqlite3.Connection) -> dict:
     result = link_all(txs, load_accounts(conn), decisions,
                       tuple(n.strip() for n in owner_setting.split(";") if n.strip()))
 
-    derived: dict[int, tuple[str, int, str, int | None]] = {}
-    for r in rows:
-        role = result.roles[r["id"]]
-        if r["id"] in result.refund_of:
-            continue  # after purchases, below
-        cat_id, source = categorizer.categorize(
-            amount_minor=r["amount_minor"], text=f"{r['counterparty'] or ''} {r['description'] or ''}",
-            mcc=r["mcc"], user_category_id=r["user_category_id"], is_transfer=role == "transfer")
-        derived[r["id"]] = (role, cat_id, source, eur[r["id"]])
+    keys = {r["id"]: cat.merchant_key(r["amount_minor"], r["counterparty"] or "", r["description"] or "")
+            for r in rows}
+    payees = {r["id"]: (r["counterparty"] or r["description"] or "").strip() for r in rows}
+
+    def categorize_all(categorizer: cat.Categorizer) -> dict[int, tuple[str, int, str, int | None]]:
+        out: dict[int, tuple[str, int, str, int | None]] = {}
+        for r in rows:
+            role = result.roles[r["id"]]
+            if r["id"] in result.refund_of:
+                continue  # after purchases, below
+            cat_id, source = categorizer.categorize(
+                amount_minor=r["amount_minor"], text=f"{r['counterparty'] or ''} {r['description'] or ''}",
+                mcc=r["mcc"], user_category_id=r["user_category_id"], is_transfer=role == "transfer",
+                key=keys[r["id"]] if role in ("expense", "income") else "", payee=payees[r["id"]])
+            out[r["id"]] = (role, cat_id, source, eur[r["id"]])
+            hints[r["id"]] = categorizer.hint
+        return out
+
+    # pass 1 finds what the user decided; pass 2 learns from it (core.learn)
+    hints: dict[int, str | None] = {}
+    first = categorize_all(categorizer)
+    examples = [Example(keys[i], payees[i], v[1]) for i, v in first.items()
+                if keys[i] and v[0] in ("expense", "income") and v[2] in ("user", "rule", "confirmed")]
+    learner = Learner(examples, [(keys[i], payees[i]) for i, v in first.items()
+                                 if keys[i] and v[0] in ("expense", "income")])
+    derived = categorize_all(cat.Categorizer(conn, learner))
     for refund_id, purchase_id in result.refund_of.items():
         r = next(x for x in rows if x["id"] == refund_id)
         if r["user_category_id"] is not None:
@@ -58,6 +76,7 @@ def recompute(conn: sqlite3.Connection) -> dict:
         else:
             cat_id, source = derived[purchase_id][1], "refund"
         derived[refund_id] = ("expense", cat_id, source, eur[refund_id])
+        hints[refund_id] = None
 
     raw_day = get_setting(conn, "salary_day", "0")
     calendar_months = not (raw_day and raw_day.isdigit() and int(raw_day) > 0)
@@ -72,9 +91,11 @@ def recompute(conn: sqlite3.Connection) -> dict:
         conn.execute("DELETE FROM tx_derived")
         conn.execute("DELETE FROM links")
         conn.executemany(
-            "INSERT INTO tx_derived (tx_id, role, category_id, category_source, amount_eur_minor, budget_date) "
-            "VALUES (?,?,?,?,?,?)",
-            [(tx_id, *values, counts_on(tx_id, values[0], values[1])) for tx_id, values in derived.items()])
+            "INSERT INTO tx_derived (tx_id, role, category_id, category_source, amount_eur_minor, budget_date, "
+            "merchant_key, category_hint) VALUES (?,?,?,?,?,?,?,?)",
+            [(tx_id, *values, counts_on(tx_id, values[0], values[1]),
+              keys[tx_id] if values[0] in ("expense", "income") else None, hints.get(tx_id))
+             for tx_id, values in derived.items()])
         conn.executemany(
             "INSERT INTO links (kind, a_id, b_id, status, evidence) VALUES (?,?,?,?,?)",
             [(l.kind, l.a_id, l.b_id, l.status, l.evidence) for l in result.links])

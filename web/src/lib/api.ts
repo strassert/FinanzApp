@@ -92,7 +92,11 @@ export interface Overview {
 export interface Status {
   version: string; demo: boolean; today: string; last_sync_at: string | null;
   warnings: { connection_id: number; institution: string; kind: string; days_left?: number; paused_until?: string }[];
-  suggestions: number; unassigned_wallet: number;
+  suggestions: number; unassigned_wallet: number; review: number;
+}
+export interface ReviewItem {
+  key: string; name: string; source: "learned" | "ai"; hint: string | null; count: number; total: number;
+  last_date: string; category: { id: number; name: string; color_slot: number | null };
 }
 export interface NetWorthPoint { date: string; value: number; not_converted: number }
 export interface TxLink { kind: string; status: string; evidence: string; other_id: number | null; other?: Tx }
@@ -101,7 +105,7 @@ export interface Tx {
   amount_eur: number | null; original_amount: number | null; original_currency: string | null;
   counterparty: string | null; description: string; counterparty_iban: string | null; mcc: string | null;
   apple_pay: boolean; note: string | null; role: string; excluded_by_user: boolean;
-  category: { id: number; name: string; color_slot: number | null; source: string; kind: string };
+  category: { id: number; name: string; color_slot: number | null; source: string; kind: string; hint: string | null };
   account: { id: number; name: string; kind: string; color_slot: number | null };
   links: TxLink[];
 }

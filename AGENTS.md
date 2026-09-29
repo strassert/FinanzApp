@@ -21,7 +21,10 @@ Spezifikation: [SPEC.md](SPEC.md), Architektur und Rechenregeln: [README.md](REA
   Vorschläge) überleben jede Neuberechnung und wandern von vorgemerkten zu
   gebuchten Umsätzen mit.
 - Kategorie-Vorrang: Wahl des Nutzers → Umbuchung → Händler-Regeln →
-  eingebaute Schlagwörter → MCC → „Sonstiges“.
+  bestätigter Händler → gelernt (selber Händler) → eingebaute Schlagwörter →
+  gelernt (Wort) → Sprachmodell → MCC → „Sonstiges“. Gelernt und Sprachmodell
+  sind Vorschläge; das Sprachmodell wird nie während der Neuberechnung
+  aufgerufen (nur dessen Speicher gelesen).
 - Keine Secrets im Repo, auch nicht in Beispielen; Zugangsdaten nur in
   gitignorierten Dateien mit `*.example`-Vorlage. Keine Transaktionsinhalte
   in Logs, keine vollen IBANs in API-Antworten.

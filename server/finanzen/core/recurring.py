@@ -25,14 +25,13 @@ every recomputation.
 
 from __future__ import annotations
 
-import re
 import sqlite3
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from statistics import median
 from typing import Optional
 
-from .categories import fold
+from . import categories
 from .db import utcnow
 
 # name -> (nominal days, tolerance in days, months per step or None, per year)
@@ -89,9 +88,7 @@ def payee(b: Booking) -> str:
 
 
 def payee_key(b: Booking) -> str:
-    text = fold(b.counterparty or b.description)
-    text = re.sub(r"[^A-Z& ]+", " ", text)          # drop digits and punctuation
-    return re.sub(r"\s+", " ", text).strip()
+    return categories.payee_key(b.counterparty, b.description)
 
 
 def group_key(b: Booking) -> str:

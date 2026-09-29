@@ -2,7 +2,7 @@
 
 
 def tx(conn, ref=None, text=None, account=None):
-    sql = """SELECT t.*, d.role, d.category_id, d.category_source, d.amount_eur_minor,
+    sql = """SELECT t.*, d.role, d.category_id, d.category_source, d.amount_eur_minor, d.merchant_key,
                     c.name AS category, a.name AS account
              FROM transactions t LEFT JOIN tx_derived d ON d.tx_id = t.id
              LEFT JOIN categories c ON c.id = d.category_id

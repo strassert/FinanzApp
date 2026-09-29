@@ -211,3 +211,14 @@ def test_periods_include_month_opened_by_salary(client, conn):
     data = client.get("/api/periods").get_json()
     assert data["current"]["key"] == "2026-09"
     assert data["items"][0]["key"] == "2026-10"
+
+
+def test_review_flow(client, conn):
+    from finanzen.core.categories import ids_by_name
+    kino = [r for r in conn.execute("SELECT id FROM transactions WHERE description LIKE 'KINO CITYPLEXX%'")]
+    client.patch(f"/api/transactions/{kino[0][0]}", json={"category_id": ids_by_name(conn)["Shopping"]})
+    assert client.get("/api/status").get_json()["review"] >= 1
+    [item] = [i for i in client.get("/api/review").get_json()["items"] if "CITYPLEXX" in i["name"]]
+    r = client.post("/api/review", json={"key": item["key"], "category_id": item["category"]["id"]})
+    assert r.status_code == 200 and item["key"] not in {i["key"] for i in r.get_json()["items"]}
+    assert client.post("/api/review", json={"key": item["key"], "category_id": "x"}).status_code == 400
