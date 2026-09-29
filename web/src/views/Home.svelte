@@ -109,8 +109,12 @@
     <!-- 2. Kategorien -->
     <section class="card">
       <h2>Kategorien</h2>
-      <BarList items={data.categories.map((c) => ({ id: c.id, label: c.name, amount: c.amount, slot: c.color_slot }))}
+      <BarList items={data.categories.map((c) => ({ id: c.id, label: c.name, amount: c.amount, slot: c.color_slot,
+                                                     average: c.average }))}
                onselect={(id) => go("umsaetze", { period: data!.period.key, kategorie: id ?? undefined })} />
+      {#if data.average_periods}
+        <p class="small muted legend"><span class="tick" aria-hidden="true"></span>Ø = Durchschnitt pro Monat {data.average_periods === 1 ? "des letzten Monats" : `der letzten ${data.average_periods} Monate`}</p>
+      {/if}
     </section>
 
     <!-- Fixkosten -->
@@ -210,4 +214,6 @@
   .fixed-total { display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; }
   .fixed-total .num { font-size: 24px; font-weight: 650; }
   .when { width: 52px; flex: none; }
+  .legend { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; }
+  .legend .tick { width: 2px; height: 14px; border-radius: 1px; background: var(--ink); flex: none; }
 </style>

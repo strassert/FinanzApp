@@ -117,3 +117,26 @@ def test_budget_follows_card_selection(conn, linked):
     card = acc_id(conn, "PayLife")
     s = reports.sums(conn, period.start, period.end, [card])
     assert reports.budget(conn, period, TODAY, s, [card])["fixed_expected"] == 0   # rent is on the giro
+
+
+def test_category_average_over_complete_past_periods(conn, linked):
+    cal = reports.calendar(conn)
+    period = cal.period_for(TODAY)
+    periods, avg = reports.category_averages(conn, cal, period)
+    first = conn.execute("SELECT MIN(booking_date) FROM transactions").fetchone()[0]
+    assert 0 < len(periods) <= 12 and all(p.start.isoformat() >= first for p in periods)
+    assert period not in periods
+    rent = next(c for c in reports.by_category(conn, periods[0].start, periods[0].end) if c["name"] == "Wohnen")
+    wohnen = sum(c["amount"] for p in periods for c in reports.by_category(conn, p.start, p.end)
+                 if c["id"] == rent["id"])
+    assert avg[rent["id"]] == round(wohnen / len(periods)) >= 95000
+    total = sum(sum(c["amount"] for c in reports.by_category(conn, p.start, p.end)) for p in periods)
+    assert abs(sum(avg.values()) - total / len(periods)) <= len(avg)  # rounding per category
+    ov = reports.overview(conn, period, TODAY)
+    assert ov["average_periods"] == len(periods)
+    assert next(c for c in ov["categories"] if c["id"] == rent["id"])["average"] == avg[rent["id"]]
+
+
+def test_category_average_needs_history(conn):
+    cal = reports.calendar(conn)
+    assert reports.category_averages(conn, cal, cal.period_for(TODAY)) == ([], {})

@@ -7,6 +7,9 @@
   noch erwartet werden + erwartete regelmäßige Einnahmen (nur im laufenden
   Zeitraum). Übrig pro Tag: Übrig / verbleibende Tage.
 - Vergleich: previous period up to the same day offset.
+- Durchschnitt je Kategorie: sum over the last 12 periods before the shown
+  one, divided by the number of those periods. Only periods that start on
+  or after the first booking count, so a short history is not diluted.
 - Vermögen: balances in EUR; a past day's balance is the latest balance minus
   the bookings since. Pending only if the balance type includes them.
   PayPal purchases paid directly by the bank do not move the PayPal balance.
@@ -95,6 +98,22 @@ def by_account(conn: sqlite3.Connection, start: date, end: date) -> list[dict]:
     return [dict(r) for r in rows if r["amount"]]
 
 
+def category_averages(conn: sqlite3.Connection, cal: PeriodCalendar, period: Period,
+                      account_ids: Optional[Iterable[int]] = None, n: int = 12) -> tuple[list[Period], dict[int, int]]:
+    first = conn.execute("SELECT MIN(booking_date) FROM transactions").fetchone()[0]
+    if not first:
+        return [], {}
+    periods: list[Period] = []
+    p = cal.previous(period)
+    while len(periods) < n and p.start >= date.fromisoformat(first):
+        periods.append(p)
+        p = cal.previous(p)
+    if not periods:
+        return [], {}
+    totals = by_category(conn, periods[-1].start, periods[0].end, account_ids)
+    return periods, {c["id"]: round(c["amount"] / len(periods)) for c in totals}
+
+
 def overview(conn: sqlite3.Connection, period: Period, today: date,
              account_ids: Optional[Iterable[int]] = None) -> dict:
     cal = calendar(conn)
@@ -106,6 +125,8 @@ def overview(conn: sqlite3.Connection, period: Period, today: date,
     prev_cutoff = min(prev.start + timedelta(days=offset), prev.end)
     prev_same_day = sums(conn, prev.start, prev_cutoff, ids)
     prev_full = sums(conn, prev.start, prev.end, ids)
+    avg_periods, averages = category_averages(conn, cal, period, ids)
+    categories = [{**c, "average": averages.get(c["id"])} for c in by_category(conn, period.start, period.end, ids)]
     return {
         "period": period_dict(period),
         "today": today.isoformat(),
@@ -117,7 +138,8 @@ def overview(conn: sqlite3.Connection, period: Period, today: date,
         "budget": budget(conn, period, today, current, ids),
         "not_converted": current.not_converted,
         "pending": current.pending,
-        "categories": by_category(conn, period.start, period.end, ids),
+        "categories": categories,
+        "average_periods": len(avg_periods),
         "cards": by_account(conn, period.start, period.end),
         "trend": trend(conn, cal, period, 12, ids),
     }

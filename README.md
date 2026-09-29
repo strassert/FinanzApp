@@ -231,6 +231,10 @@ er nach dem Monat, den er großteils abdeckt (Gehalt am 28. Sep → „Oktober�
 - **Vergleich zum Vormonat:** Ausgaben des vorigen Zeitraums bis zum
   gleichen Tag innerhalb des Zeitraums.
 - **Sparquote:** (Einnahmen − Ausgaben) / Einnahmen.
+- **Durchschnitt je Kategorie (Ø):** Summe der letzten 12 Zeiträume vor
+  dem angezeigten, geteilt durch deren Anzahl. Es zählen nur Zeiträume, die
+  nach der ersten Buchung beginnen; bei kürzerer Historie also weniger als 12.
+  Folgt der Kartenauswahl.
 - **Übrig / Übrig pro Tag:** Einnahmen − Ausgaben − Fixkosten, die bis zum
   Ende des Zeitraums noch erwartet werden (siehe „Fixkosten“; vorgemerkte
   zählen schon als Ausgabe) + erwartete regelmäßige Einnahmen; geteilt durch

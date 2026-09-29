@@ -73,7 +73,7 @@ export interface Budget {
   remaining: number; days_left: number; per_day: number | null;
 }
 export interface Period { key: string; label: string; start: string; end: string; days: number }
-export interface CategorySum { id: number; name: string; color_slot: number | null; amount: number; n: number }
+export interface CategorySum { id: number; name: string; color_slot: number | null; amount: number; n: number; average?: number | null }
 export interface AccountSum { id: number; name: string; kind: string; color_slot: number | null; amount: number; n: number }
 export interface TrendPoint extends Period { spent: number; income: number }
 export interface Account {
@@ -86,7 +86,7 @@ export interface Overview {
   period: Period; today: string; spent: number; income: number; savings_rate: number | null;
   previous: { period: Period; spent_same_day: number; spent: number; income: number; cutoff: string };
   budget: Budget;
-  not_converted: number; pending: number;
+  not_converted: number; pending: number; average_periods: number;
   categories: CategorySum[]; cards: AccountSum[]; trend: TrendPoint[]; accounts: Account[];
 }
 export interface Status {
