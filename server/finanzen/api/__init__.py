@@ -225,11 +225,7 @@ def create_app(cfg: Config, conn: Optional[sqlite3.Connection] = None,
             period = period_from_args()
             start, end = period.start, period.end
             ov_sums = reports.sums(conn, start, end, int_list("accounts"))
-            days_left = max(0, (end - today()).days + 1) if period.contains(today()) else 0
-            remaining = ov_sums.income - ov_sums.spent
-            budget = {"period": reports.period_dict(period), "income": ov_sums.income,
-                      "spent": ov_sums.spent, "remaining": remaining, "days_left": days_left,
-                      "per_day": remaining // days_left if days_left else None}
+            budget = reports.budget(conn, period, today(), ov_sums, int_list("accounts"))
         try:
             limit = min(500, int(request.args.get("limit", 100)))
             offset = int(request.args.get("offset", 0))

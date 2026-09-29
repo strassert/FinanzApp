@@ -23,43 +23,15 @@ card settlements are left out, so nothing counts twice.
 from __future__ import annotations
 
 import sqlite3
-from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Optional
 
 from . import recurring
-from .recurring import INTERVALS, Booking, Recurring, add_months, group_key, next_after
+from .recurring import Booking, Expected, Recurring, add_months, load_pending, occurrences
 from .reports import PENDING_BALANCE_TYPES, account_balances, calendar
 
 ROLES = ("expense", "income", "transfer")
 SETTLEMENT_GRACE = 5
-
-
-@dataclass
-class Expected:
-    date: date
-    name: str
-    amount: int
-    role: str
-    interval: str
-    key: str
-    overdue: bool
-
-
-def occurrences(r: Recurring, today: date, until: date, seen: list[Booking]) -> list[Expected]:
-    """Expected bookings of one series; `seen` are this account's other
-    bookings (pending, and booked ones outside the series)."""
-    tol = INTERVALS[r.interval][1]
-    ids = set(r.tx_ids)
-    out = []
-    day = r.next_date
-    while day <= until:
-        covered = any(b.id not in ids and b.date > r.last_date and group_key(b) == r.key
-                      and abs((b.date - day).days) <= tol for b in seen)
-        if not covered:
-            out.append(Expected(day, r.name, r.amount, r.role, r.interval, r.key, day < today))
-        day = next_after(day, r.interval)
-    return out
 
 
 def pending_sum(pending: list[Booking], pending_in_balance: bool) -> int:
@@ -92,20 +64,6 @@ def project(balance: int, pending: list[Booking], pending_in_balance: bool,
             low, low_date = running, max(e.date, today)
     return {"balance": balance, "pending": pending_total, "expected": expected,
             "forecast": running, "lowest": low, "lowest_date": low_date}
-
-
-def _pending(conn: sqlite3.Connection) -> dict[int, list[Booking]]:
-    out: dict[int, list[Booking]] = {}
-    for r in conn.execute("""
-            SELECT t.id, t.account_id, t.booking_date, t.amount_minor, t.counterparty, t.description,
-                   t.source, d.role, d.category_id
-            FROM transactions t JOIN tx_derived d ON d.tx_id=t.id JOIN accounts a ON a.id=t.account_id
-            WHERE t.status='pending' AND t.removed_at IS NULL
-              AND d.role != 'excluded' AND t.currency=a.currency"""):
-        out.setdefault(r["account_id"], []).append(
-            Booking(r["id"], r["account_id"], date.fromisoformat(r["booking_date"]), r["amount_minor"],
-                    r["role"], r["counterparty"] or "", r["description"] or "", r["category_id"], r["source"]))
-    return out
 
 
 def _balance_type(conn: sqlite3.Connection, account_id: int) -> Optional[str]:
@@ -176,7 +134,7 @@ def forecast(conn: sqlite3.Connection, today: date, until: Optional[date] = None
     if until is None:
         until = calendar(conn).period_for(today).end
     rejected = {k for k, v in recurring.decisions(conn).items() if v == "rejected"}
-    pending = _pending(conn)
+    pending = load_pending(conn)
     settlements, settlement_ids = card_settlements(conn, today, pending)
     booked = recurring.load_bookings(conn, today - timedelta(days=800), ROLES)
     found = [r for r in recurring.detect(booked, today, ROLES)

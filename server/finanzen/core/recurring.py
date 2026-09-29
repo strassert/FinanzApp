@@ -194,6 +194,33 @@ def detect(bookings: list[Booking], today: date,
     return out
 
 
+@dataclass
+class Expected:
+    date: date
+    name: str
+    amount: int
+    role: str
+    interval: str
+    key: str
+    overdue: bool
+
+
+def occurrences(r: Recurring, today: date, until: date, seen: list[Booking]) -> list[Expected]:
+    """Expected bookings of one series; `seen` are this account's other
+    bookings (pending, and booked ones outside the series)."""
+    tol = INTERVALS[r.interval][1]
+    ids = set(r.tx_ids)
+    out = []
+    day = r.next_date
+    while day <= until:
+        covered = any(b.id not in ids and b.date > r.last_date and group_key(b) == r.key
+                      and abs((b.date - day).days) <= tol for b in seen)
+        if not covered:
+            out.append(Expected(day, r.name, r.amount, r.role, r.interval, r.key, day < today))
+        day = next_after(day, r.interval)
+    return out
+
+
 # --- database -------------------------------------------------------------------------
 
 def load_bookings(conn: sqlite3.Connection, since: date,
@@ -208,6 +235,38 @@ def load_bookings(conn: sqlite3.Connection, since: date,
     return [Booking(r["id"], r["account_id"], date.fromisoformat(r["booking_date"]), r["amount_eur_minor"],
                     r["role"], r["counterparty"] or "", r["description"] or "", r["category_id"])
             for r in rows]
+
+
+def load_pending(conn: sqlite3.Connection) -> dict[int, list[Booking]]:
+    out: dict[int, list[Booking]] = {}
+    for r in conn.execute("""
+            SELECT t.id, t.account_id, t.booking_date, t.amount_minor, t.counterparty, t.description,
+                   t.source, d.role, d.category_id
+            FROM transactions t JOIN tx_derived d ON d.tx_id=t.id JOIN accounts a ON a.id=t.account_id
+            WHERE t.status='pending' AND t.removed_at IS NULL
+              AND d.role != 'excluded' AND t.currency=a.currency"""):
+        out.setdefault(r["account_id"], []).append(
+            Booking(r["id"], r["account_id"], date.fromisoformat(r["booking_date"]), r["amount_minor"],
+                    r["role"], r["counterparty"] or "", r["description"] or "", r["category_id"], r["source"]))
+    return out
+
+
+def upcoming(conn: sqlite3.Connection, today: date, until: date,
+             account_ids: Optional[list[int]] = None) -> list[Expected]:
+    """Expected recurring expenses and income from today to `until` (overdue
+    ones included), for the budget. Skips what a pending or differently
+    sized booking of the same payee already stands for."""
+    rejected = {k for k, v in decisions(conn).items() if v == "rejected"}
+    booked = load_bookings(conn, today - timedelta(days=800))
+    pending = [b for bs in load_pending(conn).values() for b in bs]
+    recent = [b for b in booked if b.date >= today - timedelta(days=400)]
+    out = []
+    for r in detect(booked, today):
+        if r.key in rejected or (account_ids and r.account_id not in account_ids):
+            continue
+        seen = [b for b in (*pending, *recent) if b.account_id == r.account_id]
+        out.extend(occurrences(r, today, until, seen))
+    return sorted(out, key=lambda e: (e.date, e.amount))
 
 
 def decisions(conn: sqlite3.Connection) -> dict[str, str]:

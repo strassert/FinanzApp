@@ -84,3 +84,36 @@ def test_sankey_flows_balance(conn, linked):
 def test_mask_iban():
     assert reports.mask_iban("AT45 4501 0000 0012 3456") == "AT45 •••• 3456"
     assert reports.mask_iban(None) is None
+
+
+def test_budget_subtracts_fixed_costs_still_expected(conn, linked):
+    from finanzen.core import recurring
+    from finanzen.core.periods import Period
+    period = Period(2026, 10, TODAY, date(2026, 10, 28))
+    s = reports.sums(conn, period.start, period.end)
+    b = reports.budget(conn, period, TODAY, s)
+    expected = recurring.upcoming(conn, TODAY, period.end)
+    assert {"Hausverwaltung Sonnenhof", "Salzburg AG"} <= {e.name for e in expected}
+    assert all(e.role in ("expense", "income") for e in expected)          # no savings transfers
+    assert b["fixed_expected"] == sum(e.amount for e in expected if e.role == "expense") < 0
+    assert b["remaining"] == s.income - s.spent + b["fixed_expected"] + b["income_expected"]
+    assert b["per_day"] == b["remaining"] // b["days_left"]
+    rent = next(e for e in expected if e.name == "Hausverwaltung Sonnenhof")
+    recurring.decide(conn, rent.key, "rejected")
+    assert reports.budget(conn, period, TODAY, s)["remaining"] == b["remaining"] + 95000
+
+
+def test_budget_of_a_past_period_expects_nothing(conn, linked):
+    cal = reports.calendar(conn)
+    past = cal.previous(cal.period_for(TODAY))
+    s = reports.sums(conn, past.start, past.end)
+    b = reports.budget(conn, past, TODAY, s)
+    assert b["fixed_expected"] == 0 and b["remaining"] == s.income - s.spent and b["per_day"] is None
+
+
+def test_budget_follows_card_selection(conn, linked):
+    from finanzen.core.periods import Period
+    period = Period(2026, 10, TODAY, date(2026, 10, 28))
+    card = acc_id(conn, "PayLife")
+    s = reports.sums(conn, period.start, period.end, [card])
+    assert reports.budget(conn, period, TODAY, s, [card])["fixed_expected"] == 0   # rent is on the giro

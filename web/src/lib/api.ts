@@ -67,6 +67,11 @@ export function query(params: Record<string, string | number | number[] | null |
 
 // --- types (mirror the server's JSON) -------------------------------------------
 
+// remaining = income - spent + fixed_expected (negative) + income_expected
+export interface Budget {
+  period: Period; income: number; spent: number; fixed_expected: number; income_expected: number;
+  remaining: number; days_left: number; per_day: number | null;
+}
 export interface Period { key: string; label: string; start: string; end: string; days: number }
 export interface CategorySum { id: number; name: string; color_slot: number | null; amount: number; n: number }
 export interface AccountSum { id: number; name: string; kind: string; color_slot: number | null; amount: number; n: number }
@@ -80,7 +85,7 @@ export interface Account {
 export interface Overview {
   period: Period; today: string; spent: number; income: number; savings_rate: number | null;
   previous: { period: Period; spent_same_day: number; spent: number; income: number; cutoff: string };
-  budget: { remaining: number; days_left: number; per_day: number | null };
+  budget: Budget;
   not_converted: number; pending: number;
   categories: CategorySum[]; cards: AccountSum[]; trend: TrendPoint[]; accounts: Account[];
 }
@@ -102,7 +107,7 @@ export interface Tx {
 }
 export interface TxList {
   total: number; items: Tx[];
-  budget: { period: Period; income: number; spent: number; remaining: number; days_left: number; per_day: number | null } | null;
+  budget: Budget | null;
 }
 export interface Category { id: number; name: string; kind: string; color_slot: number | null; builtin: number; sort: number }
 export interface Rule { id: number; pattern: string; category_id: number; category: string }

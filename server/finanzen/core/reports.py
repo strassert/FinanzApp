@@ -3,6 +3,9 @@
 - Ausgaben: -sum(expense); refunds are positive expenses and reduce it.
 - Einnahmen: sum(income).
 - Sparquote: (Einnahmen - Ausgaben) / Einnahmen.
+- Übrig: Einnahmen - Ausgaben - Fixkosten, die bis zum Ende des Zeitraums
+  noch erwartet werden + erwartete regelmäßige Einnahmen (nur im laufenden
+  Zeitraum). Übrig pro Tag: Übrig / verbleibende Tage.
 - Vergleich: previous period up to the same day offset.
 - Vermögen: balances in EUR; a past day's balance is the latest balance minus
   the bookings since. Pending only if the balance type includes them.
@@ -18,6 +21,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Iterable, Optional
 
+from . import recurring
 from .db import get_setting
 from .fx import Rates
 from .periods import Period, PeriodCalendar
@@ -102,8 +106,6 @@ def overview(conn: sqlite3.Connection, period: Period, today: date,
     prev_cutoff = min(prev.start + timedelta(days=offset), prev.end)
     prev_same_day = sums(conn, prev.start, prev_cutoff, ids)
     prev_full = sums(conn, prev.start, prev.end, ids)
-    days_left = max(0, (period.end - today).days + 1) if period.contains(today) else 0
-    remaining = current.income - current.spent
     return {
         "period": period_dict(period),
         "today": today.isoformat(),
@@ -112,14 +114,26 @@ def overview(conn: sqlite3.Connection, period: Period, today: date,
         "savings_rate": round((current.income - current.spent) / current.income, 4) if current.income > 0 else None,
         "previous": {"period": period_dict(prev), "spent_same_day": prev_same_day.spent,
                      "spent": prev_full.spent, "income": prev_full.income, "cutoff": prev_cutoff.isoformat()},
-        "budget": {"remaining": remaining, "days_left": days_left,
-                   "per_day": remaining // days_left if days_left else None},
+        "budget": budget(conn, period, today, current, ids),
         "not_converted": current.not_converted,
         "pending": current.pending,
         "categories": by_category(conn, period.start, period.end, ids),
         "cards": by_account(conn, period.start, period.end),
         "trend": trend(conn, cal, period, 12, ids),
     }
+
+
+def budget(conn: sqlite3.Connection, period: Period, today: date, s: Sums,
+           account_ids: Optional[Iterable[int]] = None) -> dict:
+    current = period.contains(today)
+    days_left = max(0, (period.end - today).days + 1) if current else 0
+    expected = recurring.upcoming(conn, today, period.end, list(account_ids or [])) if current else []
+    fixed = sum(e.amount for e in expected if e.role == "expense")
+    income = sum(e.amount for e in expected if e.role == "income")
+    remaining = s.income - s.spent + fixed + income
+    return {"period": period_dict(period), "income": s.income, "spent": s.spent,
+            "fixed_expected": fixed, "income_expected": income, "remaining": remaining,
+            "days_left": days_left, "per_day": remaining // days_left if days_left else None}
 
 
 def trend(conn: sqlite3.Connection, cal: PeriodCalendar, last: Period, n: int,

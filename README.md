@@ -231,6 +231,11 @@ er nach dem Monat, den er großteils abdeckt (Gehalt am 28. Sep → „Oktober�
 - **Vergleich zum Vormonat:** Ausgaben des vorigen Zeitraums bis zum
   gleichen Tag innerhalb des Zeitraums.
 - **Sparquote:** (Einnahmen − Ausgaben) / Einnahmen.
+- **Übrig / Übrig pro Tag:** Einnahmen − Ausgaben − Fixkosten, die bis zum
+  Ende des Zeitraums noch erwartet werden (siehe „Fixkosten“; vorgemerkte
+  zählen schon als Ausgabe) + erwartete regelmäßige Einnahmen; geteilt durch
+  die verbleibenden Tage. Nur im laufenden Zeitraum; folgt der
+  Kartenauswahl. Sparpläne und andere Umbuchungen zählen nicht.
 - **Vermögen:** Summe der Kontostände in EUR plus letzter Depotwert. Als
   Kontostand zählt der gebuchte bzw. aktuelle Saldo (`CLBD`, `ITBD`, `XPCD`),
   nicht „verfügbar“ (der enthält den Kreditrahmen).

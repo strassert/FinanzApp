@@ -124,6 +124,9 @@
     <div><span class="k">Einnahmen</span><span class="v num">{eur(b.income)}</span></div>
     <div><span class="k">Ausgegeben</span><span class="v num">{eur(b.spent)}</span></div>
     <div><span class="k">Übrig pro Tag</span><span class="v num">{b.per_day !== null ? eur(b.per_day) : "–"}</span></div>
+    {#if b.fixed_expected}
+      <p class="fixed">Rest nach {eur(-b.fixed_expected)} Fixkosten, die noch kommen{#if b.income_expected}, mit {eur(b.income_expected)} erwarteten Einnahmen{/if}</p>
+    {/if}
   </section>
 {/if}
 
@@ -185,6 +188,7 @@
   .budget div { display: grid; gap: 2px; }
   .budget .k { font-size: 11px; color: var(--muted); }
   .budget .v { font-weight: 600; font-size: 15px; }
+  .budget .fixed { grid-column: 1 / -1; margin: 2px 0 0; font-size: 12px; color: var(--muted); }
   .neg { color: var(--bad); }
   .day { font-size: 13px; font-weight: 600; color: var(--muted); margin: 18px 4px 6px; }
   .list { list-style: none; padding: 0 0 0 14px; margin: 0; }

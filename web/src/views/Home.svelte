@@ -83,6 +83,10 @@
             {data.budget.per_day !== null ? eur(data.budget.per_day) : eur(data.budget.remaining)}</dd>
           {#if data.budget.days_left}<dd class="days">noch {data.budget.days_left} {data.budget.days_left === 1 ? "Tag" : "Tage"}</dd>{/if}</div>
       </dl>
+      {#if data.budget.fixed_expected}
+        <p class="small muted note fixed">Übrig nach {eur(-data.budget.fixed_expected)} Fixkosten, die bis {day(data.period.end)} noch kommen{#if data.budget.income_expected}, mit {eur(data.budget.income_expected)} erwarteten Einnahmen{/if}.
+          <a href="#/fixkosten">Fixkosten ›</a></p>
+      {/if}
       {#if data.cards.length > 1}
         <div class="chips" role="group" aria-label="Karten auswählen">
           <button class="chip" aria-pressed={cards.length === 0} onclick={() => toggleCard(null)}>Alle</button>
@@ -193,6 +197,8 @@
   .figures .days { font-size: 12px; font-weight: 400; color: var(--muted); margin-top: 0; }
   .neg { color: var(--bad); }
   .note { margin: 10px 0 0; }
+  .note.fixed { margin: -6px 0 14px; }
+  .note a { color: var(--accent); text-decoration: none; white-space: nowrap; }
   .ranges { margin-bottom: 12px; }
   .accounts { list-style: none; margin: 0; padding: 0; }
   .accounts li { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--hairline); }
