@@ -288,7 +288,14 @@ enthält + alle erwarteten regelmäßigen Buchungen bis dahin.
   vorgemerkt ist oder mit anderem Betrag gebucht wurde. Überfällige Termine
   zählen weiter.
 - Zusätzlich wird der tiefste Stand im Zeitraum mit Datum angezeigt.
-- Nicht erfasst: Kreditkartenabrechnungen mit wechselndem Betrag.
+- **Kreditkarte:** Einen Monat nach der letzten Abrechnung wird der offene
+  Betrag der Karte vom zahlenden Konto abgebucht. Abrechnung = Umbuchung von
+  einem anderen Konto auf die Karte (verknüpft oder mit dem Muster der
+  Karte, z. B. `PAYLIFE`). Offener Betrag = Kartensaldo plus, was er noch
+  nicht enthält; ohne Saldo (Import ohne Saldospalte) die Summe aller
+  Kartenbuchungen. Abrechnungen zählen nicht zusätzlich als regelmäßige
+  Umbuchung. Käufe nach dem Stichtag der Karte fallen so schon in diese
+  Abrechnung; die Prognose ist dann eher zu vorsichtig.
 
 ### Vorgemerkte Umsätze und Apple Pay
 

@@ -88,3 +88,42 @@ def test_rejected_payee_leaves_the_forecast(conn, linked):
     recompute(conn)
     after = giro(forecast(conn, TODAY, TODAY + timedelta(days=30)))
     assert after["forecast"] == before["forecast"] + 95000
+
+
+# --- credit card settlement -----------------------------------------------------------
+
+def card(data):
+    return next(a for a in data["accounts"] if a["kind"] == "card")
+
+
+def test_next_settlement():
+    from finanzen.core.forecast import next_settlement
+    assert next_settlement(date(2026, 9, 11), date(2026, 9, 28)) == date(2026, 10, 11)
+    assert next_settlement(date(2026, 8, 11), date(2026, 9, 14)) == date(2026, 9, 11)   # 3 days late
+    assert next_settlement(date(2026, 6, 11), date(2026, 9, 28)) == date(2026, 10, 11)
+
+
+def test_card_settlement_moves_open_amount_to_giro(conn, linked):
+    data = forecast(conn, TODAY, TODAY + timedelta(days=30))
+    c, g = card(data), giro(data)
+    owed = -(c["balance"] + c["pending"])
+    assert owed > 0
+    [on_giro] = [e for e in g["expected"] if e["key"].startswith("card:")]
+    [on_card] = [e for e in c["expected"] if e["key"].startswith("card:")]
+    assert on_giro["amount"] == -owed and on_card["amount"] == owed
+    assert on_giro["name"] == f"Abrechnung {c['name']}" and on_giro["date"] == on_card["date"]
+    # the settlement is not also expected as a recurring transfer
+    assert not any(e["role"] == "transfer" and not e["key"].startswith("card:") and "PAYLIFE" in e["name"].upper()
+               for e in g["expected"])
+    assert not any("ZAHLUNG ERHALTEN" in e["name"] for e in c["expected"])
+
+
+def test_imported_card_without_balance_sums_its_bookings(conn, linked):
+    before = card(forecast(conn, TODAY, TODAY + timedelta(days=30)))
+    owed = -(before["balance"] + before["pending"])
+    card_id = before["id"]
+    conn.execute("UPDATE accounts SET source='import' WHERE id=?", (card_id,))
+    conn.execute("DELETE FROM balances WHERE account_id=?", (card_id,))
+    g = giro(forecast(conn, TODAY, TODAY + timedelta(days=30)))
+    [on_giro] = [e for e in g["expected"] if e["key"] == f"card:{card_id}"]
+    assert on_giro["amount"] == -owed
