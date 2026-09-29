@@ -222,3 +222,32 @@ def test_review_flow(client, conn):
     r = client.post("/api/review", json={"key": item["key"], "category_id": item["category"]["id"]})
     assert r.status_code == 200 and item["key"] not in {i["key"] for i in r.get_json()["items"]}
     assert client.post("/api/review", json={"key": item["key"], "category_id": "x"}).status_code == 400
+
+
+def test_amazon_import_items_and_decisions(client, conn):
+    from datetime import date as _date
+
+    from finanzen.core.store import NewTx, upsert_transactions
+    from .test_orders import CSV
+    giro = conn.execute("SELECT id FROM accounts WHERE institution='Volksbank Salzburg'").fetchone()[0]
+    for ref, day in (("AMZ-1", "2026-09-11"), ("AMZ-2", "2026-09-12")):
+        upsert_transactions(conn, giro, "api", [NewTx(booking_date=_date.fromisoformat(day), amount_minor=-2149,
+                                                      currency="EUR", description="AMZN Mktp DE*1A2B3C", ext_ref=ref)])
+    r = client.post("/api/import/amazon", data={"file": (io.BytesIO(CSV.encode()), "orders.csv")},
+                    content_type="multipart/form-data")
+    body = r.get_json()
+    assert r.status_code == 200 and body["new"] == 5 and body["suggested"] == 1
+    sugg = client.get("/api/suggestions").get_json()["orders"][0]
+    assert len(sugg["items"]) == 2
+    assert client.post("/api/suggestions/order", json={"shipment_key": sugg["shipment_key"], "tx_id": sugg["tx"]["id"],
+                                                       "decision": "confirmed"}).status_code == 200
+    detail = client.get(f"/api/transactions/{sugg['tx']['id']}").get_json()
+    assert [i["name"] for i in detail["items"]] == ["USB-C Kabel 2m", "Bio Kaffee 500g"]
+    cat = conn.execute("SELECT id FROM categories WHERE name='Lebensmittel'").fetchone()[0]
+    coffee = detail["items"][1]["id"]
+    assert client.patch(f"/api/order-items/{coffee}", json={"category_id": cat, "rule_pattern": "KAFFEE"}).status_code == 200
+    detail = client.get(f"/api/transactions/{sugg['tx']['id']}").get_json()
+    assert detail["items"][1]["category_name"] == "Lebensmittel"
+    bad = client.post("/api/import/amazon", data={"file": (io.BytesIO(b"x;y\n1;2\n"), "a.csv")},
+                      content_type="multipart/form-data")
+    assert bad.status_code == 422

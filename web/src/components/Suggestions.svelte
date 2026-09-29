@@ -1,6 +1,6 @@
 <script lang="ts">
   // K5: uncertain transfers and duplicates for the user to confirm or reject.
-  import { api, type Tx } from "../lib/api";
+  import { api, type OrderSuggestion, type Tx } from "../lib/api";
   import { day, signed } from "../lib/format";
   import { EVIDENCE } from "../lib/labels";
 
@@ -10,17 +10,31 @@
   } = $props();
 
   let items = $state<Suggestion[]>([]);
+  let orders = $state<OrderSuggestion[]>([]);
   let expanded = $state(false);
 
   async function load() {
     try {
-      items = (await api.get<{ items: Suggestion[] }>("/api/suggestions")).items;
+      const data = await api.get<{ items: Suggestion[]; orders: OrderSuggestion[] }>("/api/suggestions");
+      items = data.items;
+      orders = data.orders ?? [];
     } catch (e) {
       onerror(e);
     }
   }
   load();
   $effect(() => { if (open) expanded = true; });
+
+  async function decideOrder(o: OrderSuggestion, decision: "confirmed" | "rejected") {
+    try {
+      await api.post("/api/suggestions/order", { shipment_key: o.shipment_key, tx_id: o.tx.id, decision });
+      orders = orders.filter((x) => x !== o);
+      onchange();
+    } catch (e) {
+      onerror(e);
+    }
+  }
+  const count = $derived(items.length + orders.length);
 
   async function decide(s: Suggestion, decision: "confirmed" | "rejected") {
     try {
@@ -33,13 +47,30 @@
   }
 </script>
 
-{#if items.length}
+{#if count}
   <section class="card sugg">
     <button class="head" onclick={() => (expanded = !expanded)} aria-expanded={expanded}>
-      <strong>{items.length} {items.length === 1 ? "Verknüpfung" : "Verknüpfungen"} zu prüfen</strong>
+      <strong>{count} {count === 1 ? "Verknüpfung" : "Verknüpfungen"} zu prüfen</strong>
       <span aria-hidden="true">{expanded ? "▴" : "▾"}</span>
     </button>
     {#if expanded}
+      {#each orders as o}
+        <div class="item">
+          <p class="small muted">Gehört diese Abbuchung zur Amazon-Bestellung vom {day(o.order_date)}?
+            Es gibt mehrere Abbuchungen mit genau diesem Betrag.</p>
+          <div class="row">
+            <span>{o.tx.counterparty || o.tx.description}<span class="small muted"> · {day(o.tx.date)}</span></span>
+            <span class="num">{signed(o.tx.amount, o.tx.currency)}</span>
+          </div>
+          {#each o.items as it}
+            <div class="row small muted"><span>{it.name}</span><span class="num">{signed(-it.amount_minor)}</span></div>
+          {/each}
+          <div class="actions">
+            <button class="yes" disabled={demo} onclick={() => decideOrder(o, "confirmed")}>Ja, aufteilen</button>
+            <button class="no" disabled={demo} onclick={() => decideOrder(o, "rejected")}>Nein</button>
+          </div>
+        </div>
+      {/each}
       {#each items as s}
         <div class="item">
           <p class="small muted">{s.kind === "duplicate" ? "Doppelt erfasst?" : "Umbuchung zwischen eigenen Konten?"}

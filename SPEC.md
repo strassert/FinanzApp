@@ -59,6 +59,7 @@
 | F11 | Demo-Version mit erfundenen Daten, eigene Adresse, nur lesend |
 | F12 | Verschlüsselte nächtliche Backups auf die OMV-Freigabe |
 | F13 | *später:* Kennzahlen für Home Assistant über eingeschränkten Token |
+| F14 | Amazon-Bestellungen (Datenexport) importieren, Kartenabbuchungen der Volksbank in Artikel aufteilen und einzeln kategorisieren |
 
 ## Offen aus dem Bau
 
@@ -73,3 +74,7 @@
   Die Kursquelle (Yahoo Finance) ist inoffiziell; fällt sie aus, bleibt der
   letzte Kurs stehen. Positionen, die im Export fehlen (z. B. schon
   verkaufte), sind im Verlauf nicht enthalten.
+- Amazon-Export: Spaltennamen angenommen (`Order ID`, `Order Date`, `Ship Date`,
+  `Product Name`, `Total Owed` …); gegen die echte Datei prüfen. Offen auch:
+  ob Amazon wirklich pro Lieferung abbucht und wie der Buchungstext der
+  Volksbank-Karte aussieht (Annahme: enthält „AMAZON“ oder „AMZN“).

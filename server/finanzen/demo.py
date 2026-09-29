@@ -25,6 +25,8 @@ from .core import db as core_db
 from .core.categories import add_rule, ids_by_name, seed
 from .core.fx import store_rates
 from .core.recompute import recompute
+from .core import orders
+from .core.orders import OrderItem
 from .core.store import NewTx, create_manual_account, store_balance, upsert_transactions
 from . import sync
 
@@ -50,6 +52,11 @@ def make_fake(today: date, months: int = 25, seed_value: int = 11,
                              unattended_daily_limit=1000, **kwargs)
     scenario = build_scenario(fake, today, months=months, seed=seed_value)
     _add_demo_extras(scenario, today, months, random.Random(seed_value))
+    fake.demo_orders = _add_demo_orders(scenario, today, months, random.Random(seed_value + 1))
+    amazon = sum(Decimal(t["transaction_amount"]["amount"]) for t in scenario.giro.transactions
+                 if (t["entry_reference"] or "").startswith("DEMO-AMZ"))
+    for b in scenario.giro.balances:     # the debits are real money leaving the giro account
+        b["balance_amount"]["amount"] = f"{Decimal(b['balance_amount']['amount']) - amazon:.2f}"
     provider = EnableBankingProvider(DEMO_APP_ID, private_pem, transport=fake,
                                      clock=lambda: clock().timestamp())
     return fake, provider, clock
@@ -61,6 +68,44 @@ class Clock:
 
     def __call__(self) -> datetime:
         return self.now
+
+
+AMAZON_PRODUCTS = [
+    ("Druckerpatronen XL 4er-Pack", "29.99"), ("Laufschuhe Herren", "79.95"), ("USB-C Ladekabel 2m", "12.99"),
+    ("Bio Kaffeebohnen 1kg", "18.90"), ("Taschenbuch: Der Roman", "12.40"), ("LED-Glühbirnen E27 6er", "15.99"),
+    ("Zahnbürsten-Aufsätze 8 Stück", "24.99"), ("Brettspiel für 2-4 Spieler", "34.99"),
+    ("Handyhülle", "9.99"), ("Wanderrucksack 30L", "59.90"), ("Spülmaschinentabs 100 Stk", "17.49"),
+]
+
+
+def _add_demo_orders(sc, today: date, months: int, rnd: random.Random) -> list[OrderItem]:
+    """Amazon orders paid with the Volksbank card: one debit per shipment."""
+    items: list[OrderItem] = []
+    month = date(today.year, today.month, 1)
+    for _ in range(months - 1):
+        month = (month - timedelta(days=1)).replace(day=1)
+    n = 0
+    while month <= today:
+        for _ in range(rnd.randint(1, 2)):
+            order_day = month.replace(day=rnd.randint(1, 26))
+            if order_day > today - timedelta(days=3):
+                continue
+            n += 1
+            order_id = f"302-{rnd.randint(1000000, 9999999)}-{rnd.randint(1000000, 9999999)}"
+            products = rnd.sample(AMAZON_PRODUCTS, rnd.randint(1, 3))
+            ship_day = order_day + timedelta(days=1)
+            total = Decimal(0)
+            for name, price in products:
+                total += Decimal(price)
+                key = f"{order_id}|{ship_day.isoformat()}"
+                items.append(OrderItem(f"{order_id}|{name}|#0", order_id, key, order_day, ship_day, name, 1,
+                                       int(Decimal(price) * 100), "EUR", "Visa - 3456", "Closed"))
+            charge_day = ship_day + timedelta(days=rnd.randint(0, 2))
+            if charge_day <= today:
+                sc.giro.transactions.append(tx(f"-{total:.2f}", charge_day, f"AMAZON.DE*{order_id[4:11]} AMAZON.DE LU",
+                                               mcc="5942", ref=f"DEMO-AMZ-{n:04d}"))
+        month = (month + timedelta(days=32)).replace(day=1)
+    return items
 
 
 def _add_demo_extras(sc, today: date, months: int, rnd: random.Random) -> None:
@@ -174,6 +219,8 @@ def build_demo_db(path: str | Path, today: Optional[date] = None, months: int = 
         url = sync.start_consent(conn, provider, bank, "AT", DEMO_REDIRECT, now=clock)
         q = parse_qs(urlparse(fake.approve(url)).query)
         sync.complete_consent(conn, provider, q["state"][0], q["code"][0], now=clock)
+
+    orders.import_items(conn, fake.demo_orders)
 
     # flatex depot without API: monthly valuations growing with the savings plan
     depot = create_manual_account(conn, "flatex Depot", "depot", patterns="WP-KAUF,WP-VERKAUF")

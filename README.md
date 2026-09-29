@@ -350,6 +350,22 @@ dem Kurzbefehl zählen sofort als vorgemerkt; liefert die Bank denselben
 Betrag auf dem Konto (2 Tage davor bis 10 Tage danach, Fremdwährung ±3 %),
 wird die Bankbuchung damit verknüpft und die Meldung zählt nicht mehr.
 
+### Amazon-Bestellungen (Aufteilen in Positionen)
+
+Der Datenexport von Amazon (*Meine Daten anfordern → Ihre Bestellungen*, ZIP
+oder `Retail.OrderHistory.1.csv`) wird unter *Konten → Amazon-Bestellungen
+importieren* eingelesen; ein erneuter Import fügt nur Neues hinzu. Amazon
+bucht pro **Lieferung** ab, daher wird jede Lieferung (Bestellnummer +
+Versanddatum) einer Kartenabbuchung zugeordnet, deren Text Amazon nennt, mit
+genau der Lieferungssumme, 2 Tage vor bis 7 Tage nach dem Versand. Genau ein
+Kandidat → automatisch, mehrere → Vorschlag zur Bestätigung.
+
+Die zugeordnete Abbuchung wird in ihre Artikel aufgeteilt: Der Bankbetrag
+wird anteilig verteilt (größter Rest), die Teile ergeben immer exakt den
+Bankbetrag. Kategorie je Artikel: deine Wahl → deine Regeln → Schlagwörter →
+„Shopping“. Kategorien-Summen, Sankey und Filter rechnen mit den Positionen,
+Ausgaben-Summen bleiben unverändert.
+
 ## Bauplan
 
 1. ✅ Interview und Steckbrief

@@ -6,6 +6,7 @@
   import { go } from "../lib/router.svelte";
   import Sheet from "../components/Sheet.svelte";
   import Import from "../components/Import.svelte";
+  import AmazonImport from "../components/AmazonImport.svelte";
 
   let { onerror, demo = false, onchange }: { onerror: (e: unknown) => void; demo?: boolean; onchange?: () => void } = $props();
 
@@ -16,6 +17,7 @@
   let editing = $state<Account | null>(null);
   let adding = $state<"bank" | "manual" | null>(null);
   let importing = $state(false);
+  let amazon = $state(false);
   let institutions = $state<{ name: string; max_consent_days: number | null }[]>([]);
   let bankFilter = $state("");
   let syncing = $state(false);
@@ -184,6 +186,7 @@
     <li><a class="row" href="#/fixkosten"><span class="grow">Fixkosten und regelmäßige Zahlungen</span><span class="muted">›</span></a></li>
     <li><button class="row" onclick={() => go("kategorien")}><span class="grow">Kategorien und Regeln</span><span class="muted">›</span></button></li>
     <li><button class="row" disabled={demo} onclick={() => (importing = true)}><span class="grow">Datei importieren (CSV, Excel)</span><span class="muted">›</span></button></li>
+    <li><button class="row" disabled={demo} onclick={() => (amazon = true)}><span class="grow">Amazon-Bestellungen importieren</span><span class="muted">›</span></button></li>
     <li><a class="row" href="#/applepay"><span class="grow">Apple Pay sofort erfassen</span><span class="muted">›</span></a></li>
   </ul>
 </section>
@@ -234,6 +237,10 @@
       {/each}
     </ul>
   </Sheet>
+{/if}
+
+{#if amazon}
+  <AmazonImport {onerror} onclose={() => (amazon = false)} />
 {/if}
 
 {#if importing}

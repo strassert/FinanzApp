@@ -108,6 +108,15 @@ export interface Tx {
   category: { id: number; name: string; color_slot: number | null; source: string; kind: string; hint: string | null };
   account: { id: number; name: string; kind: string; color_slot: number | null };
   links: TxLink[];
+  items?: OrderLine[];
+}
+export interface OrderLine {
+  id: number; order_id: string; order_date: string; name: string; quantity: number; item_amount: number;
+  amount: number; category_id: number; category_source: string; category_name: string; category_slot: number | null;
+}
+export interface OrderSuggestion {
+  kind: "order"; shipment_key: string; tx: Tx; order_date: string;
+  items: { name: string; amount_minor: number; order_date: string }[];
 }
 export interface TxList {
   total: number; items: Tx[];

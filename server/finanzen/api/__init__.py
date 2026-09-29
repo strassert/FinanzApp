@@ -18,7 +18,7 @@ from ..auth import check_token
 from ..bank import BankError, BankProvider, PsuHeaders
 from ..config import Config
 from ..core import db as core_db
-from ..core import forecast, importer, queries, recurring, reports, wallet
+from ..core import forecast, importer, orders, queries, recurring, reports, wallet
 from ..core.recompute import recompute
 from ..core.store import create_manual_account, store_balance
 
@@ -155,7 +155,8 @@ def create_app(cfg: Config, conn: Optional[sqlite3.Connection] = None,
         return jsonify({
             "version": __version__, "demo": cfg.demo, "today": today().isoformat(),
             "last_sync_at": last, "warnings": warnings,
-            "suggestions": conn.execute("SELECT COUNT(*) FROM links WHERE status='suggested'").fetchone()[0],
+            "suggestions": conn.execute("SELECT COUNT(*) FROM links WHERE status='suggested'").fetchone()[0]
+            + conn.execute("SELECT COUNT(*) FROM order_matches WHERE status='suggested'").fetchone()[0],
             "review": conn.execute("SELECT COUNT(DISTINCT merchant_key) FROM tx_derived WHERE category_source "
                                    "IN ('learned','ai') AND merchant_key IS NOT NULL").fetchone()[0],
             "unassigned_wallet": conn.execute(
@@ -269,7 +270,48 @@ def create_app(cfg: Config, conn: Optional[sqlite3.Connection] = None,
 
     @app.get("/api/suggestions")
     def suggestion_list():
-        return jsonify({"items": queries.suggestions(conn)})
+        return jsonify({"items": queries.suggestions(conn), "orders": queries.order_suggestions(conn)})
+
+    @app.post("/api/suggestions/order")
+    def order_decide():
+        data = body()
+        try:
+            queries.decide_order(conn, str(data["shipment_key"]), int(data["tx_id"]), data.get("decision"))
+        except (KeyError, TypeError, ValueError):
+            raise ApiError(400, "Ungültige Entscheidung.")
+        recompute(conn)
+        return jsonify({"ok": True})
+
+    @app.patch("/api/order-items/<int:item_id>")
+    def order_item_update(item_id: int):
+        data = body()
+        if conn.execute("SELECT 1 FROM order_items WHERE id=?", (item_id,)).fetchone() is None:
+            raise ApiError(404, "Position nicht gefunden.")
+        category = data.get("category_id")
+        if category is not None and not isinstance(category, int):
+            raise ApiError(400, "Kategorie angeben.")
+        queries.update_order_item(conn, item_id, category, (data.get("rule_pattern") or "").strip() or None)
+        recompute(conn)
+        return jsonify({"ok": True})
+
+    @app.post("/api/import/amazon")
+    def import_amazon():
+        file = request.files.get("file")
+        if file is None:
+            raise ApiError(400, "Keine Datei.")
+        try:
+            items = orders.parse_amazon(file.read())
+        except importer.ImportError_ as exc:
+            raise ApiError(422, str(exc))
+        with core_db.transaction(conn):
+            result = orders.import_items(conn, items)
+        recompute(conn)
+        matched = conn.execute("SELECT COUNT(DISTINCT shipment_key) FROM order_matches WHERE status!='suggested'").fetchone()[0]
+        suggested = conn.execute("SELECT COUNT(*) FROM order_matches WHERE status='suggested'").fetchone()[0]
+        shipments = conn.execute("SELECT COUNT(DISTINCT shipment_key) FROM order_items").fetchone()[0]
+        return jsonify({**result, "first": result["first"] and result["first"].isoformat(),
+                        "last": result["last"] and result["last"].isoformat(),
+                        "shipments": shipments, "matched": matched, "suggested": suggested})
 
     @app.post("/api/suggestions")
     def suggestion_decide():

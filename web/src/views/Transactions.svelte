@@ -148,6 +148,7 @@
                 {#if t.status === "pending"}<span class="tag">vorgemerkt</span>{/if}
                 {#if t.budget_date && t.budget_date.slice(0, 7) !== t.date.slice(0, 7)}<span class="tag">zählt für {monthShort(t.budget_date.slice(0, 7))}</span>{/if}
                 {#if t.apple_pay}<span class="tag">Apple Pay</span>{/if}
+                {#if t.category.source === "split"}<span class="tag">aufgeteilt</span>{/if}
                 {#if t.role === "excluded"}<span class="tag">nicht mitgezählt</span>{/if}
                 {#if t.note}<span class="note">· {t.note}</span>{/if}
               </span>

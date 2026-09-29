@@ -84,12 +84,13 @@ def sums(conn: sqlite3.Connection, start: date, end: date,
 
 def by_category(conn: sqlite3.Connection, start: date, end: date,
                 account_ids: Optional[Iterable[int]] = None, role: str = "expense") -> list[dict]:
-    where, args = _account_filter(account_ids)
+    where, args = _account_filter(account_ids, "l")
     sign = -1 if role == "expense" else 1
+    # tx_lines: whole transactions, or their item lines when split (online orders)
     rows = conn.execute(f"""
-        SELECT c.id, c.name, c.color_slot, {sign} * SUM(d.amount_eur_minor) AS amount, COUNT(*) AS n
-        FROM transactions t JOIN tx_derived d ON d.tx_id=t.id JOIN categories c ON c.id=d.category_id
-        WHERE d.role=? AND d.amount_eur_minor IS NOT NULL AND d.budget_date BETWEEN ? AND ? {where}
+        SELECT c.id, c.name, c.color_slot, {sign} * SUM(l.amount_eur_minor) AS amount, COUNT(*) AS n
+        FROM tx_lines l JOIN categories c ON c.id=l.category_id
+        WHERE l.role=? AND l.amount_eur_minor IS NOT NULL AND l.budget_date BETWEEN ? AND ? {where}
         GROUP BY c.id ORDER BY amount DESC""",
                         [role, start.isoformat(), end.isoformat(), *args]).fetchall()
     return [dict(r) for r in rows if r["amount"]]
@@ -300,10 +301,10 @@ def sankey(conn: sqlite3.Connection, start: date, end: date) -> dict:
     rows = conn.execute("""
         SELECT a.id AS account_id, a.name AS account, a.color_slot AS account_slot,
                c.id AS category_id, c.name AS category, c.color_slot AS category_slot,
-               -SUM(d.amount_eur_minor) AS amount
-        FROM transactions t JOIN tx_derived d ON d.tx_id=t.id
-        JOIN accounts a ON a.id=t.account_id JOIN categories c ON c.id=d.category_id
-        WHERE d.role='expense' AND d.amount_eur_minor IS NOT NULL AND d.budget_date BETWEEN ? AND ?
+               -SUM(l.amount_eur_minor) AS amount
+        FROM tx_lines l
+        JOIN accounts a ON a.id=l.account_id JOIN categories c ON c.id=l.category_id
+        WHERE l.role='expense' AND l.amount_eur_minor IS NOT NULL AND l.budget_date BETWEEN ? AND ?
         GROUP BY a.id, c.id HAVING amount > 0""", (start.isoformat(), end.isoformat())).fetchall()
     spent_by_account: dict[int, int] = {}
     for r in rows:

@@ -58,8 +58,8 @@ def list_transactions(conn: sqlite3.Connection, *, start: Optional[date] = None,
         where.append(f"t.account_id IN ({','.join('?' * len(account_ids))})")
         args += account_ids
     if category_id:
-        where.append("d.category_id = ?")
-        args.append(category_id)
+        where.append("(d.category_id = ? OR EXISTS (SELECT 1 FROM tx_splits s WHERE s.tx_id=t.id AND s.category_id=?))")
+        args += [category_id, category_id]
     if role:
         where.append("d.role = ?")
         args.append(role)
@@ -92,11 +92,21 @@ def _links_for(conn: sqlite3.Connection, ids: list[int]) -> dict[int, list]:
     return out
 
 
+def order_lines(conn: sqlite3.Connection, tx_id: int) -> list[dict]:
+    return [dict(r) for r in conn.execute(
+        """SELECT i.id, i.order_id, i.order_date, i.name, i.quantity, i.amount_minor AS item_amount,
+                  s.amount_eur_minor AS amount, s.category_id, s.category_source, c.name AS category_name,
+                  c.color_slot AS category_slot
+           FROM tx_splits s JOIN order_items i ON i.id=s.item_id LEFT JOIN categories c ON c.id=s.category_id
+           WHERE s.tx_id=? ORDER BY s.amount_eur_minor""", (tx_id,))]
+
+
 def get_transaction(conn: sqlite3.Connection, tx_id: int) -> Optional[dict]:
     row = conn.execute(TX_SELECT + " WHERE t.id = ?", (tx_id,)).fetchone()
     if row is None:
         return None
     data = _tx_json(row, _links_for(conn, [tx_id]).get(tx_id))
+    data["items"] = order_lines(conn, tx_id)
     for link in data["links"]:
         if link["other_id"]:
             other = conn.execute(TX_SELECT + " WHERE t.id = ?", (link["other_id"],)).fetchone()
@@ -123,6 +133,32 @@ def suggestions(conn: sqlite3.Connection) -> list[dict]:
         if a and b:
             out.append({"kind": l["kind"], "evidence": l["evidence"], "a": _tx_json(a), "b": _tx_json(b)})
     return out
+
+
+def order_suggestions(conn: sqlite3.Connection) -> list[dict]:
+    out = []
+    for m in conn.execute("SELECT * FROM order_matches WHERE status='suggested'"):
+        tx = conn.execute(TX_SELECT + " WHERE t.id=?", (m["tx_id"],)).fetchone()
+        items = conn.execute("SELECT name, amount_minor, order_date FROM order_items WHERE shipment_key=?",
+                             (m["shipment_key"],)).fetchall()
+        if tx and items:
+            out.append({"kind": "order", "shipment_key": m["shipment_key"], "tx": _tx_json(tx),
+                        "items": [dict(i) for i in items], "order_date": items[0]["order_date"]})
+    return out
+
+
+def decide_order(conn: sqlite3.Connection, shipment_key: str, tx_id: int, decision: str) -> None:
+    if decision not in ("confirmed", "rejected"):
+        raise ValueError("invalid decision")
+    conn.execute("INSERT OR REPLACE INTO order_decisions (shipment_key, tx_id, decision, decided_at) "
+                 "VALUES (?,?,?,?)", (shipment_key, tx_id, decision, utcnow()))
+
+
+def update_order_item(conn: sqlite3.Connection, item_id: int, category_id: Optional[int],
+                      rule_pattern: Optional[str] = None) -> None:
+    conn.execute("UPDATE order_items SET user_category_id=? WHERE id=?", (category_id, item_id))
+    if rule_pattern and category_id:
+        cat.add_rule(conn, rule_pattern, category_id)
 
 
 def decide(conn: sqlite3.Connection, kind: str, a_id: int, b_id: int, decision: str) -> None:

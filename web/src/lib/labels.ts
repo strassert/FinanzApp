@@ -37,6 +37,8 @@ export const CATEGORY_SOURCE: Record<string, string> = {
   mcc: "Kartencode (MCC)",
   refund: "wie der ursprüngliche Kauf",
   default: "nicht erkannt",
+  split: "größte Position der Bestellung",
+  order: "Online-Bestellung",
 };
 
 export const ACCOUNT_KIND: Record<string, string> = {

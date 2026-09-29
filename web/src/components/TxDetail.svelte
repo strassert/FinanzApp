@@ -2,6 +2,7 @@
   import { api, type Category, type Tx } from "../lib/api";
   import { dayLongFmt, eurCents, signed } from "../lib/format";
   import { CATEGORY_SOURCE, EVIDENCE, LINK_KIND, ROLE } from "../lib/labels";
+  import { slotVar } from "../lib/colors";
   import Sheet from "./Sheet.svelte";
 
   let { id, categories, demo, onerror, onclose, onopen }: {
@@ -30,6 +31,19 @@
     try {
       tx = await api.patch<Tx>(`/api/transactions/${id}`, changes);
       changed = true;
+    } catch (e) {
+      onerror(e);
+    }
+  }
+
+  let itemRule = $state(false);
+
+  async function setItemCategory(itemId: number, name: string, value: string) {
+    try {
+      const pattern = itemRule ? name.split(/\s+/).slice(0, 2).join(" ").toUpperCase() : undefined;
+      await api.patch(`/api/order-items/${itemId}`, { category_id: Number(value), rule_pattern: pattern });
+      changed = true;
+      await load();
     } catch (e) {
       onerror(e);
     }
@@ -77,6 +91,28 @@
       {/each}
     {/if}
 
+    {#if tx.items?.length}
+      <h3>Positionen · Amazon-Bestellung {tx.items[0].order_id}</h3>
+      <ul class="card items">
+        {#each tx.items as it (it.id)}
+          <li>
+            <div class="line">
+              <span class="swatch" style:background={slotVar(it.category_slot)}></span>
+              <span class="grow">{it.quantity > 1 ? `${it.quantity}× ` : ""}{it.name}</span>
+              <span class="num">{signed(it.amount)}</span>
+            </div>
+            <select value={it.category_id} disabled={demo} aria-label="Kategorie für {it.name}"
+                    onchange={(e) => setItemCategory(it.id, it.name, e.currentTarget.value)}>
+              {#each categories.filter((c) => c.kind === "expense") as c}<option value={c.id}>{c.name}</option>{/each}
+            </select>
+          </li>
+        {/each}
+      </ul>
+      <label class="check small"><input type="checkbox" bind:checked={itemRule} disabled={demo} />
+        Gewählte Kategorie auch für künftige Artikel mit gleichem Namensanfang</label>
+    {/if}
+
+    {#if !tx.items?.length}
     <h3>Kategorie</h3>
     <div class="card form">
       <select value={tx.category.id} disabled={demo} onchange={(e) => setCategory(e.currentTarget.value)} aria-label="Kategorie">
@@ -87,6 +123,7 @@
         Auch künftig so zuordnen, wenn der Text enthält:</label>
       {#if makeRule}<input type="text" bind:value={rulePattern} aria-label="Muster für die Regel" />{/if}
     </div>
+    {/if}
 
     <h3>Notiz</h3>
     <div class="card form">
@@ -118,4 +155,10 @@
     border: 0; border-radius: 10px; padding: 10px 12px; width: 100%; }
   .check { display: flex; gap: 8px; align-items: center; font-size: 15px; }
   .form p { margin: 0; }
+  .items { list-style: none; padding: 4px 14px; display: grid; }
+  .items li { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--hairline); }
+  .items li:first-child { border-top: 0; }
+  .line { display: flex; gap: 8px; align-items: center; }
+  .grow { flex: 1; min-width: 0; }
+  .items select { padding: 6px 10px; font-size: 14px; }
 </style>

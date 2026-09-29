@@ -7,6 +7,7 @@ import sqlite3
 from datetime import date
 
 from . import categories as cat
+from . import orders
 from .db import get_setting, transaction
 from .fx import Rates
 from .learn import Example, Learner
@@ -99,5 +100,11 @@ def recompute(conn: sqlite3.Connection) -> dict:
         conn.executemany(
             "INSERT INTO links (kind, a_id, b_id, status, evidence) VALUES (?,?,?,?,?)",
             [(l.kind, l.a_id, l.b_id, l.status, l.evidence) for l in result.links])
+        # online orders: split matched card charges into their items
+        headline = orders.rebuild(conn, result.roles, categorizer, categorizer.ids["Shopping"])
+        for tx_id, (cat_id, source) in headline.items():
+            if derived[tx_id][2] != "user":
+                conn.execute("UPDATE tx_derived SET category_id=?, category_source=? WHERE tx_id=?",
+                             (cat_id, source, tx_id))
     return {"transactions": len(rows), "links": len(result.links),
             "suggestions": sum(1 for l in result.links if l.status == "suggested")}
