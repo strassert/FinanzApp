@@ -1,19 +1,18 @@
 <script lang="ts">
-  import { api, query, type NetWorthPoint, type Overview, type Period, type Recurring } from "../lib/api";
+  import { api, query, type Overview, type Period, type Recurring, type Summary } from "../lib/api";
   import { day, eur, percent, signed } from "../lib/format";
   import { slotVar } from "../lib/colors";
   import { go, route } from "../lib/router.svelte";
   import BarList from "../components/BarList.svelte";
   import TrendChart from "../components/TrendChart.svelte";
-  import LineChart from "../components/LineChart.svelte";
-  import ForecastCard from "../components/ForecastCard.svelte";
+  import BalanceSummary from "../components/BalanceSummary.svelte";
+  import NetWorthCard from "../components/NetWorthCard.svelte";
 
   let { onerror }: { onerror: (e: unknown) => void } = $props();
 
   let data = $state<Overview | null>(null);
   let cards = $state<number[]>([]);          // F4: card selection
-  let range = $state("1J");
-  let worth = $state<NetWorthPoint[]>([]);
+  let summary = $state<Summary | null>(null);
   let loading = $state(false);
   let fixed = $state<Recurring | null>(null);
   let periods = $state<Period[]>([]);          // newest first
@@ -52,13 +51,14 @@
     }
   }
 
-  async function loadWorth() {
+  async function loadSummary() {
     try {
-      worth = (await api.get<{ points: NetWorthPoint[] }>(`/api/networth?range=${range}`)).points;
+      summary = await api.get<Summary>("/api/summary");
     } catch (e) {
       onerror(e);
     }
   }
+  loadSummary();
 
   async function loadFixed() {
     try {
@@ -70,23 +70,26 @@
   loadFixed();
 
   $effect(() => { void cards; void periodKey; load(); });
-  $effect(() => { void range; loadWorth(); });
 
   function toggleCard(id: number | null) {
     cards = id === null ? [] : cards.includes(id) ? cards.filter((c) => c !== id) : [...cards, id];
   }
 
   const compare = $derived(data ? data.spent - data.previous.spent_same_day : 0);
-  const accountsTotal = $derived(data ? data.accounts.reduce((s, a) => s + (a.balance_eur ?? 0), 0) : 0);
   const nextFixed = $derived(fixed ? [...fixed.items].filter((i) => i.role === "expense")
     .sort((a, b) => a.next_date.localeCompare(b.next_date)).slice(0, 3) : []);
-  const RANGES = ["1M", "3M", "6M", "1J", "3J", "Alles"];
 </script>
+
+{#if isCurrent && summary}
+  <BalanceSummary data={summary} />
+  <NetWorthCard data={summary.net_worth} {onerror} />
+{/if}
 
 {#if data}
   <div class:reloading={loading}>
-    <!-- 1. Ausgaben -->
+    <!-- Dieser Monat -->
     <section class="card hero" aria-labelledby="h-spent">
+      <h2 id="h-spent">Dieser Monat</h2>
       <div class="period">
         <button class="nav" aria-label="Vorheriger Monat" disabled={shownIdx < 0 || shownIdx >= periods.length - 1}
                 onclick={() => step(-1)}>‹</button>
@@ -94,7 +97,6 @@
         <button class="nav" aria-label="Nächster Monat" disabled={shownIdx <= 0} onclick={() => step(1)}>›</button>
         {#if !isCurrent}<button class="today small" onclick={() => go("")}>Aktueller Monat</button>{/if}
       </div>
-      <h2 id="h-spent" class="sr-only">Ausgaben</h2>
       <div class="label small">Ausgegeben{cards.length ? " (Auswahl)" : ""}</div>
       <div class="big num">{eur(data.spent)}</div>
       <div class="cmp small">
@@ -108,15 +110,7 @@
       <dl class="figures">
         <div><dt>Einnahmen</dt><dd class="num">{eur(data.income)}</dd></div>
         <div><dt>Sparquote</dt><dd class="num">{percent(data.savings_rate)}</dd></div>
-        <div><dt>{data.budget.per_day !== null ? "Übrig pro Tag" : "Übrig"}</dt>
-          <dd class="num" class:neg={data.budget.remaining < 0}>
-            {data.budget.per_day !== null ? eur(data.budget.per_day) : eur(data.budget.remaining)}</dd>
-          {#if data.budget.days_left}<dd class="days">noch {data.budget.days_left} {data.budget.days_left === 1 ? "Tag" : "Tage"}</dd>{/if}</div>
       </dl>
-      {#if data.budget.fixed_expected}
-        <p class="small muted note fixed">Übrig nach {eur(-data.budget.fixed_expected)} Fixkosten, die bis {day(data.period.end)} noch kommen{#if data.budget.income_expected}, mit {eur(data.budget.income_expected)} erwarteten Einnahmen{/if}.
-          <a href="#/fixkosten">Fixkosten ›</a></p>
-      {/if}
       {#if data.cards.length > 1}
         <div class="chips" role="group" aria-label="Karten auswählen">
           <button class="chip" aria-pressed={cards.length === 0} onclick={() => toggleCard(null)}>Alle</button>
@@ -133,8 +127,6 @@
         </p>
       {/if}
     </section>
-
-    {#if isCurrent}<ForecastCard {onerror} />{/if}
 
     <!-- 2. Kategorien -->
     <section class="card">
@@ -182,34 +174,6 @@
       <h2>12 Monate</h2>
       <TrendChart points={data.trend} current={data.period.key} />
     </section>
-
-    <!-- 5. Vermögensverlauf -->
-    <section class="card">
-      <h2>Vermögen</h2>
-      <div class="chips ranges" role="group" aria-label="Zeitraum">
-        {#each RANGES as r}
-          <button class="chip" aria-pressed={range === r} onclick={() => (range = r)}>{r}</button>
-        {/each}
-      </div>
-      <LineChart points={worth} />
-    </section>
-
-    <!-- 6. Konten -->
-    <section class="card">
-      <h2>Konten</h2>
-      <ul class="accounts">
-        {#each data.accounts as a (a.id)}
-          <li>
-            <span class="dot" style:background={slotVar(a.color_slot)}></span>
-            <span class="name">{a.name}{#if a.iban}<span class="small muted"> · {a.iban.slice(-4)}</span>{/if}</span>
-            <span class="num" class:neg={(a.balance ?? 0) < 0}>
-              {#if a.currency !== "EUR" && a.balance !== null}<span class="small muted">{(a.balance / 100).toLocaleString("de-AT", { style: "currency", currency: a.currency })} · </span>{/if}{eur(a.balance_eur)}
-            </span>
-          </li>
-        {/each}
-        <li class="total"><span class="name">Gesamt</span><span class="num">{eur(accountsTotal)}</span></li>
-      </ul>
-    </section>
   </div>
 {:else}
   <div class="card skeleton">Lade …</div>
@@ -225,26 +189,20 @@
   .nav:focus-visible, .today:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .today { all: unset; margin-left: auto; color: var(--accent); cursor: pointer; }
   .hero .label { color: var(--ink-2); }
-  .big { font-size: 48px; font-weight: 650; letter-spacing: -0.02em; line-height: 1.1; margin: 2px 0 6px;
+  .big { font-size: 34px; font-weight: 650; letter-spacing: -0.02em; line-height: 1.1; margin: 2px 0 6px;
          font-variant-numeric: normal; }
   .cmp { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
   .more { color: var(--bad); font-weight: 600; }
   .less { color: var(--good); font-weight: 600; }
-  .figures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 14px;
+  .figures { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 0 0 14px;
              padding-top: 12px; border-top: 1px solid var(--hairline); }
   .figures dt { font-size: 12px; color: var(--muted); }
   .figures dd { margin: 2px 0 0; font-weight: 600; font-size: 17px; }
-  .figures .days { font-size: 12px; font-weight: 400; color: var(--muted); margin-top: 0; }
-  .neg { color: var(--bad); }
   .note { margin: 10px 0 0; }
-  .note.fixed { margin: -6px 0 14px; }
-  .note a { color: var(--accent); text-decoration: none; white-space: nowrap; }
-  .ranges { margin-bottom: 12px; }
   .accounts { list-style: none; margin: 0; padding: 0; }
   .accounts li { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--hairline); }
   .accounts li:first-child { border-top: 0; padding-top: 0; }
   .accounts .name { flex: 1; min-width: 0; }
-  .accounts .total { font-weight: 600; }
   .skeleton { color: var(--muted); }
   .more-link { display: flex; justify-content: space-between; align-items: baseline; color: inherit; text-decoration: none; }
   .fixed-total { display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; }

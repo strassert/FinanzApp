@@ -251,3 +251,9 @@ def test_amazon_import_items_and_decisions(client, conn):
     bad = client.post("/api/import/amazon", data={"file": (io.BytesIO(b"x;y\n1;2\n"), "a.csv")},
                       content_type="multipart/form-data")
     assert bad.status_code == 422
+
+
+def test_summary(client):
+    data = client.get("/api/summary").get_json()
+    assert {"balance", "lines", "available", "net_worth", "salary"} <= set(data)
+    assert data["available"] == data["balance"] + sum(l["amount"] for l in data["lines"])

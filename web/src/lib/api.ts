@@ -150,3 +150,19 @@ export interface ForecastAccount {
   expected: ExpectedBooking[];
 }
 export interface Forecast { today: string; until: string; accounts: ForecastAccount[]; balance: number; forecast: number }
+
+export interface SummaryLine {
+  kind: "pending" | "card" | "fixed" | "income"; label: string; amount: number; date: string | null; overdue?: boolean;
+  pending?: number;              // card lines: part not yet in the card's booked balance
+}
+export interface NetWorthPart {
+  key: string; label: string; amount: number;
+  accounts: { id: number; name: string; amount: number; color_slot: number | null }[];
+}
+export interface Summary {
+  today: string; until: string;
+  salary: { date: string; amount: number; name: string; overdue: boolean } | null;
+  accounts: { id: number; name: string; balance: number; color_slot: number | null }[];
+  balance: number; lines: SummaryLine[]; outgoing: number; incoming: number; available: number;
+  net_worth: { total: number; parts: NetWorthPart[]; not_converted: number };
+}

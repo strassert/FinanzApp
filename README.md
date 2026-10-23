@@ -350,6 +350,23 @@ dem Kurzbefehl zählen sofort als vorgemerkt; liefert die Bank denselben
 Betrag auf dem Konto (2 Tage davor bis 10 Tage danach, Fremdwährung ±3 %),
 wird die Bankbuchung damit verknüpft und die Meldung zählt nicht mehr.
 
+### Startseite: frei verfügbar und Vermögen
+
+**Auf deinen Konten** ist der Saldo von Girokonto und PayPal (EUR, mit
+Bankanbindung). **Geht noch weg** listet bis zum Tag vor dem nächsten Gehalt
+(nächster Termin der regelmäßigen Einnahme in „Gehalt“; ohne Gehalt bis
+Monatsende): vorgemerkte Umsätze, die erwarteten Fixkosten und Umbuchungen
+(z. B. Sparplan) dieser Konten und die nächste Kreditkartenabrechnung. Die
+Kartenabrechnung zählt immer, auch wenn sie erst nach dem Gehalt abgebucht
+wird, weil das Geld schon ausgegeben ist; sie enthält die noch vorgemerkten
+Kartenzahlungen und ist daher größer als der gebuchte Kartensaldo im
+Vermögen. **Frei verfügbar** = Saldo + alle Zeilen; „pro Tag“ teilt das durch
+die Tage bis zum Gehalt.
+
+**Vermögen** = Summe aller Konten in EUR, gruppiert: Konten (Giro, PayPal),
+Kreditkarten (gebuchter Saldo, negativ), Depot und Wertpapiere (Depot,
+Verrechnungskonto), Sparen und Sonstiges.
+
 ### Amazon-Bestellungen (Aufteilen in Positionen)
 
 Der Datenexport von Amazon (*Meine Daten anfordern → Ihre Bestellungen*, ZIP

@@ -83,7 +83,7 @@ def test_jwt_is_reused_and_renewed(scenario, provider, fake, clock):
     assert fake.calls[-1].headers["Authorization"] != first
 
 
-def test_consent_flow_returns_accounts(scenario, provider, fake):
+def test_consent_flow_returns_accounts(scenario, provider, fake, clock):
     session = connect(provider, fake, VOLKSBANK)
     assert len(session.accounts) == 1
     acc = session.accounts[0]
@@ -91,7 +91,7 @@ def test_consent_flow_returns_accounts(scenario, provider, fake):
     assert acc.owner_name == "Max Mustermann"
     assert acc.name == "Gehaltskonto"  # product, not the owner's name
     assert acc.credit_limit_minor == 150000
-    assert session.valid_until > datetime.now(timezone.utc) + timedelta(days=170)
+    assert session.valid_until > clock() + timedelta(days=170)
 
 
 def test_consent_validity_capped_by_bank_maximum(scenario, provider, fake, clock):
